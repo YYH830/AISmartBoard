@@ -30,7 +30,7 @@ const { exec, spawn } = require('child_process');
  * 目录结构约定：
  *   项目根/
  *   ├── launchers/                   启动脚本（Windows / macOS 本机用）
- *   ├── README.txt                  使用说明
+ *   ├── README.md                   使用说明
  *   ├── DEPLOY.txt                  服务器部署说明
  *   ├── data/                       ← 所有 .md 台账文件（用户数据）
  *   └── app/                        ← 本脚本与 index.html 所在位置
