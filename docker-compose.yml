@@ -1,0 +1,26 @@
+# AI智能看板 —— docker compose 配置
+#
+# 启动：docker compose up -d
+# 停止：docker compose down
+# 看日志：docker compose logs -f
+#
+# 首次启动前，请把下面的 WTK_PASS 改成你自己的密码。
+
+services:
+  work-board:
+    build: .
+    image: work-task-board
+    container_name: work-board
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    environment:
+      WTK_HOST: "0.0.0.0"
+      WTK_PORT: "8765"
+      WTK_USER: "admin"
+      # ⚠ 务必修改成你自己的密码
+      WTK_PASS: "12345"
+      TZ: "Asia/Shanghai"
+    volumes:
+      # 台账数据放在宿主机，容器重建也不会丢
+      - ./data:/app/data

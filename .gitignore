@@ -1,0 +1,16 @@
+# ===== 本地密钥 / 配置（绝不上传）=====
+.env
+.users.json
+.ai-config.json
+
+# ===== 真实业务数据（台账、团队、AI 历史、回收站）=====
+data/
+
+# ===== 运行时产物 =====
+app/.server-port
+*.log
+
+# ===== 依赖 / 系统 =====
+node_modules/
+.DS_Store
+Thumbs.db

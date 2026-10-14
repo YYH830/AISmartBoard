@@ -1,0 +1,16 @@
+{
+  "name": "work-task-board",
+  "version": "1.0.0",
+  "private": true,
+  "description": "以 Markdown 表格为数据源的个人AI智能看板（零依赖，仅需 Node.js）",
+  "main": "app/server.js",
+  "scripts": {
+    "start": "node app/server.js",
+    "serve": "node app/server.js --no-open",
+    "check": "node --check app/server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "license": "MIT"
+}
