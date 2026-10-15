@@ -212,6 +212,24 @@ main{
 .acct-menu .btn{width:100%;justify-content:flex-start;background:transparent;border:0}
 .acct-menu .btn:hover{background:var(--panel-2)}
 
+/* 任务池排序下拉菜单 */
+.sort-menu{
+  position:fixed;z-index:10050;min-width:150px;padding:6px;
+  background:var(--bg-1);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow-lg);
+}
+.sort-menu .sm-item{
+  display:flex;align-items:center;gap:6px;width:100%;padding:8px 10px;border:0;
+  background:transparent;color:var(--text);font-size:13px;border-radius:8px;
+  cursor:pointer;text-align:left;font-family:inherit;
+}
+.sort-menu .sm-item:hover{background:var(--panel-2)}
+.sort-menu .sm-item.on{color:var(--brand-1);font-weight:600}
+.sort-menu .sm-item .tick{width:13px;flex:none;opacity:0}
+.sort-menu .sm-item.on .tick{opacity:1}
+/* 排序生效时隐藏「拖动调整顺序」把手：此时显示的已非用户手动顺序 */
+.pool-list.sorted .grip{display:none}
+
 
 /* 未绑定文件提示条 */
 .banner{
@@ -994,7 +1012,7 @@ main{
         <div class="searchwrap">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
           <input type="text" id="search" placeholder="搜索任务（按 / 聚焦）">
-          <button class="icon-btn sorticon" id="btnSortByStatus" title="按状态排序">
+          <button class="icon-btn sorticon" id="btnSort" title="排序">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg>
           </button>
           <button class="icon-btn sorticon" id="btnFilter" title="筛选（状态 / 优先级 / 标签）">
@@ -1363,7 +1381,7 @@ main{
   /* ---------------------------- 应用状态 ---------------------------- */
   let state = { tasks: [], segments: [] };
   // 默认筛选「未排期」：打开就能看到还没安排日期的任务，先排期再干活
-  const view = { ym: today().slice(0, 7), filter: 'unscheduled', q: '', priorities: [], tags: [] };
+  const view = { ym: today().slice(0, 7), filter: 'unscheduled', q: '', priorities: [], tags: [], sort: 'manual' };
   let drag = null;             // 当前拖拽会话
   let dirty = false;           // 是否有未落盘的编辑
   let saveTimer = null;
@@ -2174,6 +2192,106 @@ main{
   /* ============================================================================
    * 五、任务池渲染
    * ========================================================================== */
+  /* ---------------- 任务池排序 / 偏好持久化 ---------------- */
+  const SORT_DEFS = [
+    ['manual', '默认顺序'],
+    ['status', '按状态'],
+    ['priority', '按优先级'],
+    ['tag', '按标签'],
+    ['days', '按人天'],
+  ];
+  const POOL_PREF_KEY = 'wtk-pool-prefs';
+  const sortLabel = (k) => { const d = SORT_DEFS.find((x) => x[0] === k); return d ? d[1] : k; };
+
+  /** 恢复上次的排序 / 筛选选择（否则刷新后被还原）。搜索词不持久化。 */
+  function loadPoolPrefs() {
+    try {
+      const o = JSON.parse(localStorage.getItem(POOL_PREF_KEY) || 'null');
+      if (!o || typeof o !== 'object') return;
+      if (SORT_DEFS.some((d) => d[0] === o.sort)) view.sort = o.sort;
+      const f = o.filter;
+      if (f && typeof f === 'object') {
+        if (typeof f.filter === 'string') view.filter = f.filter;
+        if (Array.isArray(f.priorities)) view.priorities = f.priorities.slice();
+        if (Array.isArray(f.tags)) view.tags = f.tags.slice();
+      }
+    } catch (e) { /* 忽略损坏的存档 */ }
+  }
+  function savePoolPrefs() {
+    try {
+      localStorage.setItem(POOL_PREF_KEY, JSON.stringify({
+        sort: view.sort,
+        filter: { filter: view.filter, priorities: view.priorities, tags: view.tags },
+      }));
+    } catch (e) { /* 忽略 */ }
+  }
+
+  /** 返回排序后的副本（不改动 state.tasks 里用户的「手动顺序」） */
+  function sortTasks(list) {
+    if (view.sort === 'manual') return list;
+    const idx = (t) => state.tasks.indexOf(t);
+    const arr = list.slice();
+    if (view.sort === 'status') {
+      const w = { todo: 0, paused: 1, done: 2 };
+      arr.sort((a, b) => (w[a.status] - w[b.status]) || (idx(a) - idx(b)));
+    } else if (view.sort === 'priority') {
+      const w = { high: 0, medium: 1, low: 2 };
+      arr.sort((a, b) => (w[a.priority || DEFAULT_PRIORITY] - w[b.priority || DEFAULT_PRIORITY]) || (idx(a) - idx(b)));
+    } else if (view.sort === 'tag') {
+      const first = (t) => (t.tags && t.tags.length ? t.tags[0] : '');
+      arr.sort((a, b) => {
+        const fa = first(a), fb = first(b);
+        if (!fa && !fb) return idx(a) - idx(b);
+        if (!fa) return 1;                      // 无标签的排最后
+        if (!fb) return -1;
+        return fa.localeCompare(fb, 'zh') || (idx(a) - idx(b));
+      });
+    } else if (view.sort === 'days') {
+      arr.sort((a, b) => ((b.days || 0) - (a.days || 0)) || (idx(a) - idx(b)));   // 人天多的在前
+    }
+    return arr;
+  }
+
+  /** 排序下拉菜单 */
+  function openSortMenu() {
+    const b = $('btnSort');
+    if (!b) return;
+    const ex = document.getElementById('sortMenu');
+    if (ex) { ex.remove(); return; }            // 再次点击 = 关闭
+    const m = document.createElement('div');
+    m.className = 'sort-menu';
+    m.id = 'sortMenu';
+    m.innerHTML = SORT_DEFS.map(([k, l]) =>
+      '<button class="sm-item' + (view.sort === k ? ' on' : '') + '" data-sort="' + k + '"><span class="tick">✓</span>' + l + '</button>'
+    ).join('');
+    document.body.appendChild(m);
+    const r = b.getBoundingClientRect();
+    m.style.top = (r.bottom + 8) + 'px';
+    m.style.right = Math.max(12, window.innerWidth - r.right) + 'px';
+
+    const off = (e) => {
+      if (!m.contains(e.target) && e.target !== b && !b.contains(e.target)) {
+        m.remove(); document.removeEventListener('click', off, true);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', off, true), 0);
+
+    m.addEventListener('click', (e) => {
+      const it = e.target.closest('[data-sort]');
+      if (!it) return;
+      view.sort = it.dataset.sort;
+      savePoolPrefs();
+      m.remove();
+      renderPool();
+      toast('排序：' + sortLabel(view.sort));
+    });
+  }
+  /** 更新排序按钮的悬浮提示，反映当前排序方式 */
+  function updateSortBtn() {
+    const b = $('btnSort');
+    if (b) b.title = '排序（当前：' + sortLabel(view.sort) + '）';
+  }
+
   function filteredTasks() {
     const q = view.q.trim().toLowerCase();
     return state.tasks.filter((t) => {
@@ -2188,7 +2306,7 @@ main{
   }
 
   function renderPool() {
-    const list = filteredTasks();
+    const list = sortTasks(filteredTasks());
     const html = list.map((t) => {
       const segs = segsOfTask(t.id);
       const schedTag = segs.length
@@ -2227,7 +2345,9 @@ main{
       '按 <kbd>N</kbd> 新建任务，或点击日历格子的 ＋<br>然后把卡片拖到左边的日历上排期</div>'
     );
     var pcEl = $('poolCount'); if (pcEl) pcEl.textContent = state.tasks.length;
+    $('poolList').classList.toggle('sorted', view.sort !== 'manual');
     updateFilterBtn();
+    updateSortBtn();
   }
 
   /** 是否设置了「非默认」筛选（用于筛选按钮上的小圆点） */
@@ -2568,7 +2688,7 @@ main{
         if (cellEl) cellEl.classList.add('hot');
       }
       drag.dropDay = h.day;
-      updateDropLine(y);
+      if (view.sort === 'manual') updateDropLine(y); else removeDropLine();   // 非手动顺序下不显示插入线
     }
 
     if (ghostEl.style.display !== 'none') {
@@ -2657,7 +2777,7 @@ main{
         scheduleOn(d.taskId, h.day);
         markDirty();
         toast('「' + (t ? t.title : '') + '」已排到 ' + shortDate(h.day));
-      } else if (h.pool || h.card) {        // 池内拖拽 -> 调整顺序
+      } else if ((h.pool || h.card) && view.sort === 'manual') {   // 池内拖拽 -> 调整顺序（仅手动顺序下生效）
         const beforeId = nearestCardId(e.clientY, d.taskId);
         snapshot();
         reorderTask(d.taskId, beforeId);
@@ -3538,13 +3658,7 @@ main{
       }
     };
 
-    $('btnSortByStatus').onclick = () => {
-      snapshot();
-      const w = { todo: 0, paused: 1, done: 2 };
-      state.tasks.sort((a, b) => w[a.status] - w[b.status]);
-      markDirty();
-      toast('已按状态排序');
-    };
+    $('btnSort').onclick = openSortMenu;
     // 顶栏不再放主题按钮，皮肤改到「看板设置 → 个性化设置」里
     $('btnAcct').onclick = openAccountMenu;
     $('btnBind').onclick = async () => {
@@ -3594,6 +3708,7 @@ main{
         view.priorities = filterDraft.priorities.slice();
         view.tags = filterDraft.tags.slice();
       }
+      savePoolPrefs();            // 记住筛选选择，刷新后不丢
       closeFilterModal();
       renderPool();
     };
@@ -3640,6 +3755,7 @@ main{
     booted = true;
     const th = localStorage.getItem('wtk-theme');
     if (th) document.documentElement.dataset.theme = th;
+    loadPoolPrefs();               // 恢复上次的排序 / 筛选选择
     bindUI();
     await Store.init();
     renderAll();
