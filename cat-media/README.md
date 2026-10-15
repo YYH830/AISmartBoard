@@ -176,9 +176,25 @@ python check_action_scale.py ../app/assets/cat idle # 各动作屏幕尺度是�
 |---|---|---|
 | `check_cat_video.py` | 源视频：绿幕 / 裁切 / 位移 | `python check_cat_video.py inbox/x.mp4` |
 | `check_action_frames.py` | 首尾帧：绿幕 / 裁切 / 各动作位置一致性 | `python check_action_frames.py` |
+| `cat_check.py` | **毛发长度**（防"长毛变短毛"）/ 毛色一致性 / 尺寸占比 | `python cat_check.py` |
+| `cat_compare.py` | 同猫对照图：app 现用素材 + 参考图 + 各动作首帧，按体高对齐 | `python cat_compare.py` |
 | `check_action_flow.py` | **帧序**有没有乱（D2/D1 判据） | `python check_action_flow.py ../app/assets/cat` |
 | `check_action_scale.py` | 各动作**屏幕尺度**，算出需要的 `scale` | `python check_action_scale.py ../app/assets/cat idle` |
 | `check_loop.py` | 循环闭合质量（gap vs step） | `python check_loop.py cat-x` |
+
+> `cat_check.py` 的毛发指标只是**粗略提示**（脚本自己也会声明这一点）：
+> 它能发现"整批都变短毛了"这类系统性偏差，但单个动作 70%~90% 的差异不可靠，
+> **最终以 `cat_compare.py` 出的对照图人眼判断为准**。
+
+### 应用侧验证
+
+| 脚本 | 作用 | 用法 |
+|---|---|---|
+| `test_rotation.js` | 动作轮换逻辑的**无界面回归测试**：把 index.html 里的猫猫 IIFE 抽出来，喂 DOM 桩 + 假时钟，验证切换节奏、手点、拖拽、双击回位等 10 个场景（29 项断言） | `node test_rotation.js` |
+| `mock-nginx-subpath.js` | 本机模拟 nginx 的 `/board/` 子路径反代，验证**子路径部署**下素材能否正常加载 | `node mock-nginx-subpath.js` |
+
+`test_rotation.js` 改完 `ROTATION` 或切换逻辑后**务必跑一遍**，它的期望值是从
+`index.html` 里读 `ROTATION` 的，加动作不需要改测试本身。
 
 ---
 
@@ -258,6 +274,14 @@ python check_action_scale.py ../app/assets/cat idle # 各动作屏幕尺度是�
 六个动作首帧的姿势必须各自贴合动作本身（详见 `猫猫动作提示词.md`）。
 早期所有动作都拿站立图当首帧，模型被带跑：睡觉要从站姿一路演变成蜷缩，
 动作又长又假，还容易被裁切。
+
+### 8. 测试里的期望值别写死「动作个数」
+
+`test_rotation.js` 原先在断言里写死了 `'idle,walk,idle,walk,idle,walk'`
+和「连点 4 次回到起点」——那还是 ROTATION 只有两个动作时的语义。
+后来往轮换里加动作，逻辑一直是好的，测试却开始报「顺序不对」，
+容易误以为功能坏了。现在期望值改成从 `index.html` 里读 `ROTATION`，
+**加动作后不必再动测试**。凡是「随动作数量变化」的断言，都该这样推导，不要抄字面值。
 
 ---
 
