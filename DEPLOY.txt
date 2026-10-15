@@ -57,6 +57,7 @@
       app/server.js           服务程序（必需）
       app/index.html          界面（必需）
       app/login.html          登录页（必需）
+      app/assets/             静态资源：桌宠猫猫动画素材（webp / webm）
       data/                   数据目录
       start.sh                启动脚本
 
@@ -248,7 +249,7 @@
         --restart unless-stopped \
         -p 8765:8765 \
         -e WTK_USER=admin -e WTK_PASS=你的密码 \
-        -v /opt/work-task-board/data:/app/台账 \
+        -v /opt/work-task-board/data:/app/data \
         work-task-board
 
   ⚠ 一定要挂载 -v 到宿主机目录，否则容器重建后台账数据会丢。
