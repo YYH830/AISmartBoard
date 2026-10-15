@@ -1,0 +1,23 @@
+{
+  "source": "doze.mp4",
+  "total_frames": 97,
+  "usable": [
+    60,
+    86
+  ],
+  "loop_mode": "指定窗口（源帧 60~86，不搜段）",
+  "frames": 27,
+  "stride": 1,
+  "frame_size": [
+    130,
+    143
+  ],
+  "duration_ms": 42,
+  "loop_step_diff": 8.48,
+  "loop_gap_diff": 3.85,
+  "bg_color": [
+    3.0,
+    152.0,
+    67.0
+  ]
+}

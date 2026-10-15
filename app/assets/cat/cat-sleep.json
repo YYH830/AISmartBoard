@@ -1,0 +1,23 @@
+{
+  "source": "sleep.mp4",
+  "total_frames": 97,
+  "usable": [
+    2,
+    31
+  ],
+  "loop_mode": "乒乓循环（指定）",
+  "frames": 29,
+  "stride": 2,
+  "frame_size": [
+    259,
+    143
+  ],
+  "duration_ms": 83,
+  "loop_step_diff": 3.74,
+  "loop_gap_diff": 1.61,
+  "bg_color": [
+    9.0,
+    145.0,
+    71.0
+  ]
+}

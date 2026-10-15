@@ -1,0 +1,23 @@
+{
+  "source": "hop.mp4",
+  "total_frames": 97,
+  "usable": [
+    19,
+    41
+  ],
+  "loop_mode": "指定窗口（源帧 19~41，不搜段）",
+  "frames": 23,
+  "stride": 1,
+  "frame_size": [
+    151,
+    144
+  ],
+  "duration_ms": 42,
+  "loop_step_diff": 39.0,
+  "loop_gap_diff": 9.83,
+  "bg_color": [
+    9.0,
+    155.0,
+    66.0
+  ]
+}

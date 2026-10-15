@@ -4075,7 +4075,7 @@ main{
  * ----------------------------------------------------------------------------
  * 行为：
  *   · 出生点 —— 日历面板上边框、LOGO 与看板名称的右侧（不会挡住 LOGO）
- *   · 动作轮换 —— 按 ROTATION 顺序循环播放动作（待机 ↔ 走路…），
+ *   · 动作轮换 —— 按 ROTATION 顺序循环播放动作（待机 → 走路 → 睡觉 …），
  *                 默认每 5 分钟换一个（可在「看板设置 → 个性化」里按档位调，
  *                 「不自动切换」到 30 分钟共 8 档）；
  *                 会位移的动作会真的走一段，距离按间隔换算
@@ -4085,10 +4085,14 @@ main{
  *   · 避让   —— 当猫身在竖直方向会盖到顶栏时，自动把活动范围收在
  *               「LOGO/标题」与「右侧按钮区」之间的空档里，绝不遮挡 LOGO 和名称
  * 扩展：
- *   以后要加「睡觉 / 舔毛」等动图，把素材放进 app/assets/cat/，
- *   在 CAT_ACTIONS 里加一行、并把它加进 ROTATION 即可（原地动作写 moves:false）。
- *   素材打包约定：动画帧对齐后「贴紧猫体」裁掉留白，保证各动作里
- *   猫占画幅的比例一致，否则切换动作时猫会突然变大变小。
+ *   要加新动图，把素材放进 app/assets/cat/，
+ *   在 CAT_ACTIONS 里加一行、并把它加进 ROTATION 即可。
+ *   原地动作写 moves:false；若该动作是「趴着不动」这类（睡觉/打瞌睡/洗脸），再补个
+ *   roam:false 禁掉随机瞬移，免得猫趴到一半突然淡出、又在别处冒出来。
+ *   素材打包约定：动画帧对齐后「贴紧猫体」裁掉留白。应用里猫宽固定 72px，
+ *   所以「素材宽高比」直接等于猫在屏幕上的宽高比 —— 比例失真就会在切换动作时
+ *   看到猫突然变大变小（打包细节见 cat-media/process_walk.py）。
+ *   若某动作幅度不合适，用 CAT_ACTIONS[key].scale 补偿（详见 check_action_scale.py）。
  * ========================================================================== */
 (function () {
   'use strict';
@@ -4143,20 +4147,49 @@ main{
   var assetOk = true;                       // 素材加载失败时置 false，避免显示破图
   var broken  = {};                         // 记录加载失败的动作素材，避免反复重试破图
 
-  /* 动作表：key -> { file, moves }
-       moves:true  → 该动作会带着猫位移（走路）
-       moves:false → 原地动作（待机，以后的睡觉 / 舔毛等）
-     新增动作：把素材丢进 app/assets/cat/，这里加一行，再加进下面的 ROTATION 即可。 */
+  /* 动作表：key -> { file, moves, roam, scale }
+       moves:true   → 该动作会带着猫位移（走路）
+       moves:false  → 原地动作（待机 / 睡觉 / 舔毛等）
+       roam:false   → 原地动作里也【不】随机换地方：趴下睡觉的猫突然淡出、
+                      又在别处出现会很怪，所以睡觉这类"待着不动"的动作要禁掉瞬移。
+       scale        → 显示缩放倍数（默认 1）。各动作姿势的宽高比差很远，元素宽
+                      一律取 cfg.w 的话，猫在屏上的实际大小会差一倍，这个值用来补偿。
+     新增动作：把素材丢进 app/assets/cat/，这里加一行，再加进下面的 ROTATION 即可。
+     素材约定：贴紧猫体裁掉留白。应用里图片 width:100%，所以「素材宽高比」直接
+     决定容器高度；而猫到底占多大还要看它在素材里画得多满（细节见 cat-media/）。 */
   var CAT_ACTIONS = {
-    idle: { file: 'cat-idle.webp', moves: false },
-    walk: { file: 'cat-walk.webp', moves: true }
-    // doze: { file: 'cat-doze.webp', moves: false }
+    idle:  { file: 'cat-idle.webp',  moves: false },
+    walk:  { file: 'cat-walk.webp',  moves: true  },
+    // 伸懒腰：整段视频本身就是一个完整循环 —— 起手时已经是伸开的姿势，猫先起身、
+    // 再重新伸懒腰，首尾姿势相近，所以用「整段直放」就能自己接上（闭合比 0.91），
+    // 比乒乓自然（乒乓会把「起身→伸开」重复两遍）。素材 161x144，24fps。
+    // scale 1.35：素材是横向摊开的姿势，不放大只有待机的一半多（实测面积 56%）。
+    stretch: { file: 'cat-stretch.webp', moves: false, roam: false, scale: 1.35 },
+    // 睡觉：趴卧。素材 259x143（比站立矮很多是正常的，真猫趴下也就站高的四成）。
+    // scale 1.28：趴卧姿势横向摊得最开，同容器宽下猫体只有待机的 61%（实测面积），
+    // 不补偿的话切到睡觉会明显感觉猫"缩水"了一截。
+    sleep: { file: 'cat-sleep.webp', moves: false, roam: false, scale: 1.28 },
+    // 打瞌睡：坐姿点头。素材 130x143，27 帧。这是六个动作里姿势最"方正"的一个，
+    // 屏幕面积 3712px² 反而比待机（3387）还大一点，所以不需要 scale 补偿。
+    doze:  { file: 'cat-doze.webp',  moves: false, roam: false },
+    // 舔毛洗脸：坐姿抬一爪擦脸。素材 153x143，25 帧。
+    // 素材偏宽（左边缘是摊在地上的长尾巴，占掉不少横向空间），同宽度下渲染高只有
+    // 67px，实测屏幕面积是待机的 77%，scale 1.14 补回来。
+    groom: { file: 'cat-groom.webp', moves: false, roam: false, scale: 1.14 },
+    // 开心跳：原地起跳。素材 151x144，23 帧。
+    // 唯一带【垂直位移】的动作：打包时用 process_walk.py --keep-v 保留跳跃高度，
+    // 否则逐帧把脚底拉平会把"跳"压成"原地蹬腿"。素材里脚底只在下蹲帧贴底边，
+    // 空中的帧浮在上方 —— 应用里容器底边仍是地面，跳起时猫自然离地。
+    // scale 1.15：素材要给跳跃留出纵向空间，猫本体的屏幕面积只有待机的 75%。
+    hop:   { file: 'cat-hop.webp',   moves: false, roam: false, scale: 1.15 }
   };
 
   /* 动作轮换顺序：自动切换与「点击换动作」都按这个顺序循环。
      想让某个动作多出现几次，就把它在数组里多写几遍；想停用某个动作，
-     从数组里去掉即可（不影响素材本身）。 */
-  var ROTATION = ['idle', 'walk'];
+     从数组里去掉即可（不影响素材本身）。
+     顺序上刻意排成一只真猫的一天：站 → 走 → 开心跳 → 伸懒腰 → 洗脸 → 打瞌睡 → 睡觉，
+     睡醒后又回到待机。 */
+  var ROTATION = ['idle', 'walk', 'hop', 'stretch', 'groom', 'doze', 'sleep'];
 
   /* 行为模式：roam = 漫步（按 ROTATION 轮换动作）。
      单次动作（睡觉等）用别的值表示，届时主循环不再轮换。 */
@@ -4176,6 +4209,7 @@ main{
   var dragMoved = false;                            // 本次按下是否已构成拖拽（超过 4px）
   var clickTimer = 0;                               // 单击延时器：等一小会儿看是不是双击
   var actionKey = null;
+  var rotIdx = 0;           // 动作轮换游标：ROTATION 的下标，记录"轮到第几个了"
   var settleUntil = 0;      // 出生点"稳定期"截止时间：等版面排定后再落位
   var settleNextAt = 0;
   var paused = false;       // 通过控制台 cat.pause() 暂停漫步
@@ -4277,20 +4311,36 @@ main{
     imgEl.src = ASSET_DIR + a.file;
   }
 
+  /** 当前动作的显示缩放倍数（CAT_ACTIONS[key].scale，没写就是 1）。
+   *  用来补偿「不同动作姿势宽高比不同」导致的实际大小差异 ——
+   *  详见 applyCfg() 里的说明。素材载入后会重新走一遍 applyCfg()，
+   *  所以切换动作时容器尺寸会自动跟着变。 */
+  function actionScale() {
+    var a = CAT_ACTIONS[actionKey];
+    return (a && a.scale) || 1;
+  }
+
   /* ---------------- 动作轮换（自动切换 + 点击切换） ----------------
      节奏由 cfg.switchSec 统一控制，不再随机抖动：
        · 每到切换时间 → 按 ROTATION 顺序切到下一个动作
        · 用户单击猫猫 → 立刻切到下一个动作（并重新计时，不会紧接着又被自动切走）
      会位移的动作（walk）切到后会真的走一段，走完由主循环收回待机。 */
   /** 切到 ROTATION 里的下一个动作。
-   *  fromKey：以哪个动作为"当前"往后切（默认取实际动作）。
-   *          单击时传入按下瞬间的动作，避免中途动作变化导致结果不可预期。 */
+   *  fromKey：以哪个动作为"当前"往后切（默认沿用轮换游标）。
+   *          单击时传入按下瞬间的动作，避免中途动作变化导致结果不可预期。
+   *  为什么不用「当前实际在播的动作」反推下一位：
+   *    walk 在可走范围过窄时会退化成 idle（避免原地迈腿），于是实际动作变成 idle，
+   *    再往后推就又轮到 walk —— 会永远在 idle ↔ walk 之间打转，
+   *    ROTATION 里排在 walk 后面的动作（睡觉等）永远轮不到。
+   *    所以另用 rotIdx 记住"轮到第几个了"，与实际在播的动作解耦。 */
   function advanceAction(now, byUser, fromKey) {
     measure();                // 取最新布局：窗口缩放、任务池收起都会改变可走范围
-    var base = fromKey || actionKey;
-    var i = ROTATION.indexOf(base);
-    var key = ROTATION[(i + 1) % ROTATION.length];
-    applyAction(key, now, byUser);
+    if (fromKey) {
+      var fi = ROTATION.indexOf(fromKey);
+      if (fi >= 0) rotIdx = fi;   // 用户单击：以按下瞬间的动作为准接下去
+    }
+    rotIdx = (rotIdx + 1) % ROTATION.length;
+    applyAction(ROTATION[rotIdx], now, byUser);
     if (byUser) flash();      // 用户手动切换给个轻微反馈，不然看不出"点生效了"
   }
 
@@ -4311,8 +4361,11 @@ main{
       render();
       setAction(key);
       // 站着的时候偶尔「悄悄换个地方」，免得整天待在同一个角落。
-      // 但用户刚点过就千万别挪走 —— 点了换动作、结果猫消失，很莫名。
-      if (!byUser && now >= nextTeleportAllowedAt && Math.random() < TELEPORT_P) teleport();
+      // 但两种情况下不能挪：
+      //   1) 用户刚点过 —— 点了换动作、结果猫消失，很莫名；
+      //   2) 该动作声明了 roam:false（例如睡觉）—— 趴着的猫瞬移会非常突兀。
+      if (!byUser && a.roam !== false && now >= nextTeleportAllowedAt &&
+          Math.random() < TELEPORT_P) teleport();
     }
     nextSwitchAt = now + cfg.switchSec * 1000;      // 重新计时
   }
@@ -4533,9 +4586,14 @@ main{
    *  改大小或改开关后都走这里，保证位置不会跑到可视范围外 */
   function applyCfg() {
     SPEED = REF_DIST / cfg.tripSec;
-    size.w = cfg.w;
-    size.h = Math.round(cfg.w * ratio);
-    if (el) el.style.width = cfg.w + 'px';
+    // 各动作的姿势宽高比差得很远：伸懒腰的猫是横向摊开的（素材宽高比 1.12）、
+    // 睡觉是趴扁的（1.81），而待机/走路接近方形。如果一律塞进同样宽 cfg.w 的容器，
+    // 猫在屏幕上的实际大小会差一倍（实测伸懒腰只有待机的 56%）。
+    // 所以每个动作可以在 CAT_ACTIONS 里用 scale 补偿，让「屏幕上有多少猫」看起来一致。
+    var w = Math.round(cfg.w * actionScale());
+    size.w = w;
+    size.h = Math.round(w * ratio);
+    if (el) el.style.width = w + 'px';
     if (layer) layer.style.display = (cfg.on && assetOk) ? '' : 'none';
     measure();
     clampPos();

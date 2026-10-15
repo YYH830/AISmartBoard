@@ -1,0 +1,13 @@
+{
+  "source": "cat-stretch-frames",
+  "loop_mode": "直放（首尾需自相似）",
+  "frames": 97,
+  "stride": 1,
+  "frame_size": [
+    161,
+    144
+  ],
+  "duration_ms": 42,
+  "loop_step_diff": 12.71,
+  "loop_gap_diff": 5.84
+}
