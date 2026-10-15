@@ -14,3 +14,21 @@ app/.server-port
 node_modules/
 .DS_Store
 Thumbs.db
+
+# ===== 猫猫动画素材工作台（cat-media/）=====
+# 只同步「处理工具 + 文档」，不入库下面这些：
+#   · 密钥：ARK_KEY 也能走环境变量，密钥文件不需要进仓库
+#   · 原始视频：inbox/ 下的绿幕 mp4，动辄十几 MB 且随时会换
+#   · 中间产物：processed/ 下的抠图像素帧，跑一轮就几百个文件
+#   · 生成物：refs/actions/ 是 gen_action_frames.mjs 的输出，可随时重新生成
+#   · 临时图：各种质检 / 对照用的 png，都能由脚本重新画出来
+cat-media/.ark-key
+cat-media/inbox/
+cat-media/processed/
+cat-media/__pycache__/
+cat-media/*.png
+cat-media/refs/actions/
+cat-media/refs/green/_*.png
+cat-media/refs/cat-ref-walk.png
+cat-media/refs/E2-peach-real.png
+cat-media/refs/P3-stretch.png
