@@ -4106,7 +4106,7 @@ main{
   var TELEPORT_MIN_GAP = 30000;             // 两次「换个地方」之间的最小间隔（ms），杜绝连续瞬移
   var DRAG_SETTLE_MS   = 1500;              // 拖拽松手后的安顿时间：先在落点站定，再开始走
   var EDGE       = 6;                       // 与视口左右边缘的留白（px）
-  var ASSET_DIR  = '/assets/cat/';          // 素材目录（由 server.js 静态提供）
+  var ASSET_DIR  = 'assets/cat/';           // 素材目录（相对当前页面，兼容 /board/ 子路径部署；由 server.js 静态提供）
   var LS_KEY     = 'wtk-cat';               // 位置持久化 key
   var LS_CFG     = 'wtk-cat-config';        // 外观 / 行为偏好持久化 key
 
