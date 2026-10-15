@@ -1099,17 +1099,12 @@ main{
                 <input type="range" id="setCatSpeed" min="6" max="120" step="2" value="60">
                 <span class="val" id="setCatSpeedVal">60 秒</span>
               </div>
-              <div class="subrow">
-                <span class="sublabel">动作切换</span>
-                <input type="range" id="setCatSwitch" min="0" max="7" step="1" value="5">
-                <span class="val" id="setCatSwitchVal">5 分钟</span>
-              </div>
               <div class="hintline">
                 移动速度 = 猫猫走完「一个日历面板宽度」所需的秒数；数值越大走得越慢，往左拖即走得更快。
               </div>
               <div class="hintline">
-                动作切换 = 每隔多久换一个动作（待机 ↔ 走路），可选「不自动切换」到 30 分钟。
-                平时随时单击猫猫也能立刻换下一个动作，双击召回原位，按住可以把猫拖到别处。
+                猫猫会自己随机活动：每个动作待多久、待在哪儿都不固定，时不时溜达到别处换个动作。
+                单击猫猫可以立刻换动作，双击让它随机换个位置，按住还能把它拖到任何地方。
               </div>
             </div>
           </section>
@@ -2366,16 +2361,6 @@ main{
     });
   }
 
-  /** 猫猫「动作切换」的档位表（含显示文案），懒加载一次并缓存。
-   *  档位定义在猫猫脚本里（那边是唯一数据源），这里只负责画滑杆，避免两处写死以后对不上。 */
-  let _catSwitchOpts = null;
-  function catSwitchOpts() {
-    if (!_catSwitchOpts && window.cat && window.cat.getSwitchOptions) {
-      _catSwitchOpts = window.cat.getSwitchOptions();
-    }
-    return _catSwitchOpts;
-  }
-
   /** 把猫猫配置回填到设置面板（猫猫脚本未就绪时静默跳过） */
   function renderCatSetting() {
     const c = (window.cat && window.cat.getConfig) ? window.cat.getConfig() : null;
@@ -2387,20 +2372,8 @@ main{
     $('setCatSizeVal').textContent = c.w + ' px';
     $('setCatSpeed').value = c.tripSec;
     $('setCatSpeedVal').textContent = c.tripSec + ' 秒';
-
-    // 动作切换：档位表决定滑杆的刻度数，当前值反查出下标
-    const opts = catSwitchOpts();
-    if (opts && opts.length) {
-      const input = $('setCatSwitch');
-      input.max = opts.length - 1;
-      let idx = opts.findIndex((o) => o.sec === c.switchSec);
-      if (idx < 0) {                                    // 配置里是个意外值：吸附到最近档位
-        let bd = Infinity;
-        opts.forEach((o, i) => { const d = Math.abs(o.sec - c.switchSec); if (d < bd) { bd = d; idx = i; } });
-      }
-      input.value = idx;
-      $('setCatSwitchVal').textContent = opts[idx].label;
-    }
+    // 这里原有一根「动作切换」档位滑杆，现已移除：动作时长与位置都改成随机，
+    // 不该也不需要让用户去调 —— 详见猫猫脚本里 rollSwitchSec 的说明。
   }
   function renderCalSettings() {
     const seg = $('calSchedMode');
@@ -3384,14 +3357,6 @@ main{
       $('setCatSpeedVal').textContent = s + ' 秒';
       if (window.cat && window.cat.setTripSec) window.cat.setTripSec(s);
     });
-    $('setCatSwitch').addEventListener('input', (e) => {
-      const opts = catSwitchOpts();
-      if (!opts) return;
-      const o = opts[+e.target.value];
-      if (!o) return;
-      $('setCatSwitchVal').textContent = o.label;
-      if (window.cat && window.cat.setSwitchSec) window.cat.setSwitchSec(o.sec);
-    });
 
     $('calSchedMode').addEventListener('click', (e) => {
       const b = e.target.closest('[data-mode]');
@@ -4076,19 +4041,23 @@ main{
  * 行为：
  *   · 出生点 —— 日历面板上边框、LOGO 与看板名称的右侧（不会挡住 LOGO）
  *   · 动作轮换 —— 按 ROTATION 顺序循环播放动作（待机 → 走路 → 睡觉 …），
- *                 默认每 5 分钟换一个（可在「看板设置 → 个性化」里按档位调，
- *                 「不自动切换」到 30 分钟共 8 档）；
- *                 会位移的动作会真的走一段，距离按间隔换算
+ *                 每段停留多久由系统随机决定（SWITCH_MIN_SEC ~ SWITCH_MAX_SEC）。
+ *                 刻意不做成设置项：间隔一旦固定，节奏就变得可预期（隔多久换、
+ *                 几点换都算得出来），随机化之后才有"咦它怎么动了"的惊喜。
+ *                 会位移的动作会真的走一段，距离按这一段停留时长换算
+ *   · 位置随机 —— 每次自动换动作时按概率「溜达到别处」，位置同样随机
  *   · 单击   —— 立刻换下一个动作（并重新计时）
- *   · 双击   —— 召回默认出生点
+ *   · 双击   —— 随机换个位置（不再回出生点；回家留给控制台 cat.home()）
  *   · 拖拽   —— 按住猫可拖到任意位置，松手后位置记入 localStorage('wtk-cat')
  *   · 避让   —— 当猫身在竖直方向会盖到顶栏时，自动把活动范围收在
  *               「LOGO/标题」与「右侧按钮区」之间的空档里，绝不遮挡 LOGO 和名称
  * 扩展：
  *   要加新动图，把素材放进 app/assets/cat/，
  *   在 CAT_ACTIONS 里加一行、并把它加进 ROTATION 即可。
- *   原地动作写 moves:false；若该动作是「趴着不动」这类（睡觉/打瞌睡/洗脸），再补个
- *   roam:false 禁掉随机瞬移，免得猫趴到一半突然淡出、又在别处冒出来。
+ *   原地动作写 moves:false。
+ *   位置随机（瞬移）由全局 TELEPORT_P 统一控制，而且只发生在「切换动作的那一刻」，
+ *   所以不需要按动作逐个开关 —— 猫是先淡出、再在新位置以新姿势出现，
+ *   读起来是"溜达到别处去了"，而不是趴着不动时凭空消失。
  *   素材打包约定：动画帧对齐后「贴紧猫体」裁掉留白。应用里猫宽固定 72px，
  *   所以「素材宽高比」直接等于猫在屏幕上的宽高比 —— 比例失真就会在切换动作时
  *   看到猫突然变大变小（打包细节见 cat-media/process_walk.py）。
@@ -4106,7 +4075,7 @@ main{
   var ASSET_RATIO = 96 / 100;               // 素材宽高比（100x96），载入后按真实尺寸校正
   var STEP_MIN   = 24;                      // 单次行走最短距离（px）：间隔设得很短时就是小碎步
   var STEP_MAX   = 520;                     // 单次行走最长距离（px）：间隔设得很大时也别横穿整个屏幕
-  var TELEPORT_P = 0.5;                     // 站着待机时「悄悄换个地方」的概率（调小 = 更安分）
+  var TELEPORT_P = 0.5;                     // 每次自动换动作时「溜达到别处」的概率（调小 = 更安分）
   var TELEPORT_MIN_GAP = 30000;             // 两次「换个地方」之间的最小间隔（ms），杜绝连续瞬移
   var DRAG_SETTLE_MS   = 1500;              // 拖拽松手后的安顿时间：先在落点站定，再开始走
   var EDGE       = 6;                       // 与视口左右边缘的留白（px）
@@ -4114,45 +4083,34 @@ main{
   var LS_KEY     = 'wtk-cat';               // 位置持久化 key
   var LS_CFG     = 'wtk-cat-config';        // 外观 / 行为偏好持久化 key
 
-  /* 动作自动切换的可选档位（秒），0 = 不自动切换。
-     设置面板的滑杆用的是「档位下标」而不是秒数本身：
-     档位跨越 10 秒 ~ 30 分钟这么宽的范围，若直接用秒数做线性滑杆，
-     几十秒那一段会被压得只剩几个像素、根本拖不准。 */
-  var SWITCH_STEPS = [0, 10, 30, 60, 120, 300, 600, 1800];
-  var SWITCH_SEC_DEF = 300;                 // 默认切换间隔（秒）：5 分钟
-  var SWITCH_SEC_LEGACY = 30;               // 曾经的默认值，仅用于老配置迁移
-  var CFG_VER = 1;                          // 配置版本号，配合一次性迁移使用
+  /* 动作自动切换的停留时长（秒）—— 从区间里随机取，刻意不做成设置项。
+     为什么去掉这个设置：间隔一旦固定，猫的节奏就变得可预期（隔多久换、几点换
+     都算得出来），反而没有"它自己活着"的感觉；随机之后才有惊喜。
+     区间取值的取舍：太短会让猫一直在换动作（眼花、看不清单个动作），
+     太长又像卡住不动。20~150 秒均值约 85 秒，实测观感比较自然。
+     想调就改这两行。 */
+  var SWITCH_MIN_SEC = 20;
+  var SWITCH_MAX_SEC = 150;
 
-  /** 把任意秒数吸附到最接近的档位，保证配置里只存合法档位 */
-  function snapSwitchSec(sec) {
-    var best = SWITCH_STEPS[0], bd = Infinity;
-    for (var i = 0; i < SWITCH_STEPS.length; i++) {
-      var d = Math.abs(SWITCH_STEPS[i] - sec);
-      if (d < bd) { bd = d; best = SWITCH_STEPS[i]; }
-    }
-    return best;
+  /** 为「这一轮」动作随机决定停留时长（秒）。
+   *  用的是全局 Math.random —— 无界面回归测试 test_rotation.js 会把传入的 Math
+   *  换成可编排的假 Math，从而把"随机"变成可复现的（见那边的 scriptedMath）。 */
+  function rollSwitchSec() {
+    return SWITCH_MIN_SEC + Math.random() * (SWITCH_MAX_SEC - SWITCH_MIN_SEC);
   }
 
-  /** 档位的显示文案：0 → 不自动切换，60 以内用秒，再往上用分钟 */
-  function switchLabel(sec) {
-    if (!sec) return '不自动切换';
-    if (sec < 60) return sec + ' 秒';
-    return (sec / 60) + ' 分钟';
-  }
-
-  /** 用户可配置项（「看板设置 → 个性化设置」里改，立即生效并记住） */
-  var cfg = { on: true, w: CAT_W_DEF, tripSec: TRIP_SEC_DEF, switchSec: SWITCH_SEC_DEF };
+  /** 用户可配置项（「看板设置 → 个性化设置」里改，立即生效并记住）
+   *  只保留 开关 / 大小 / 速度三项；动作节奏和位置都是随机的，由脚本自己决定。 */
+  var cfg = { on: true, w: CAT_W_DEF, tripSec: TRIP_SEC_DEF };
   var SPEED   = REF_DIST / cfg.tripSec;     // 行走速度（px/s），由 tripSec 换算
   var ratio   = ASSET_RATIO;                // 实际宽高比，图片载入后校正
   var assetOk = true;                       // 素材加载失败时置 false，避免显示破图
   var broken  = {};                         // 记录加载失败的动作素材，避免反复重试破图
 
-  /* 动作表：key -> { file, moves, roam, scale }
-       moves:true   → 该动作会带着猫位移（走路）
-       moves:false  → 原地动作（待机 / 睡觉 / 舔毛等）
-       roam:false   → 原地动作里也【不】随机换地方：趴下睡觉的猫突然淡出、
-                      又在别处出现会很怪，所以睡觉这类"待着不动"的动作要禁掉瞬移。
-       scale        → 显示缩放倍数（默认 1）。各动作姿势的宽高比差很远，元素宽
+  /* 动作表：key -> { file, moves, scale }
+      moves:true   → 该动作会带着猫位移（走路）
+      moves:false  → 原地动作（待机 / 睡觉 / 舔毛等）
+      scale        → 显示缩放倍数（默认 1）。各动作姿势的宽高比差很远，元素宽
                       一律取 cfg.w 的话，猫在屏上的实际大小会差一倍，这个值用来补偿。
      新增动作：把素材丢进 app/assets/cat/，这里加一行，再加进下面的 ROTATION 即可。
      素材约定：贴紧猫体裁掉留白。应用里图片 width:100%，所以「素材宽高比」直接
@@ -4164,24 +4122,24 @@ main{
     // 再重新伸懒腰，首尾姿势相近，所以用「整段直放」就能自己接上（闭合比 0.91），
     // 比乒乓自然（乒乓会把「起身→伸开」重复两遍）。素材 161x144，24fps。
     // scale 1.35：素材是横向摊开的姿势，不放大只有待机的一半多（实测面积 56%）。
-    stretch: { file: 'cat-stretch.webp', moves: false, roam: false, scale: 1.35 },
+    stretch: { file: 'cat-stretch.webp', moves: false, scale: 1.35 },
     // 睡觉：趴卧。素材 259x143（比站立矮很多是正常的，真猫趴下也就站高的四成）。
     // scale 1.28：趴卧姿势横向摊得最开，同容器宽下猫体只有待机的 61%（实测面积），
     // 不补偿的话切到睡觉会明显感觉猫"缩水"了一截。
-    sleep: { file: 'cat-sleep.webp', moves: false, roam: false, scale: 1.28 },
+    sleep: { file: 'cat-sleep.webp', moves: false, scale: 1.28 },
     // 打瞌睡：坐姿点头。素材 130x143，27 帧。这是六个动作里姿势最"方正"的一个，
     // 屏幕面积 3712px² 反而比待机（3387）还大一点，所以不需要 scale 补偿。
-    doze:  { file: 'cat-doze.webp',  moves: false, roam: false },
+    doze:  { file: 'cat-doze.webp',  moves: false },
     // 舔毛洗脸：坐姿抬一爪擦脸。素材 153x143，25 帧。
     // 素材偏宽（左边缘是摊在地上的长尾巴，占掉不少横向空间），同宽度下渲染高只有
     // 67px，实测屏幕面积是待机的 77%，scale 1.14 补回来。
-    groom: { file: 'cat-groom.webp', moves: false, roam: false, scale: 1.14 },
+    groom: { file: 'cat-groom.webp', moves: false, scale: 1.14 },
     // 开心跳：原地起跳。素材 151x144，23 帧。
     // 唯一带【垂直位移】的动作：打包时用 process_walk.py --keep-v 保留跳跃高度，
     // 否则逐帧把脚底拉平会把"跳"压成"原地蹬腿"。素材里脚底只在下蹲帧贴底边，
     // 空中的帧浮在上方 —— 应用里容器底边仍是地面，跳起时猫自然离地。
     // scale 1.15：素材要给跳跃留出纵向空间，猫本体的屏幕面积只有待机的 75%。
-    hop:   { file: 'cat-hop.webp',   moves: false, roam: false, scale: 1.15 }
+    hop:   { file: 'cat-hop.webp',   moves: false, scale: 1.15 }
   };
 
   /* 动作轮换顺序：自动切换与「点击换动作」都按这个顺序循环。
@@ -4202,6 +4160,7 @@ main{
   var facing  = 1;                                  // 1 朝右，-1 朝左
   var geo     = {};                                 // 界面几何缓存
   var leg     = null;                               // 当前行走段 { from, to, start, dur }
+  var switchSec = SWITCH_MIN_SEC;                   // 「这一轮」动作停留多久（秒），每次换动作时重掷
   var nextSwitchAt = 0;                             // 下一次动作自动切换的时间戳
   var dragging = false;
   var dragOff = { x: 0, y: 0 };
@@ -4321,7 +4280,7 @@ main{
   }
 
   /* ---------------- 动作轮换（自动切换 + 点击切换） ----------------
-     节奏由 cfg.switchSec 统一控制，不再随机抖动：
+     节奏由 rollSwitchSec() 随机决定，每一轮都重掷：
        · 每到切换时间 → 按 ROTATION 顺序切到下一个动作
        · 用户单击猫猫 → 立刻切到下一个动作（并重新计时，不会紧接着又被自动切走）
      会位移的动作（walk）切到后会真的走一段，走完由主循环收回待机。 */
@@ -4358,25 +4317,31 @@ main{
       }
     } else {
       leg = null;                                   // 原地动作：先停掉正在进行的行走
-      render();
-      setAction(key);
-      // 站着的时候偶尔「悄悄换个地方」，免得整天待在同一个角落。
-      // 但两种情况下不能挪：
+      // 换动作的这一刻，按概率「溜达到别处」—— 位置随机就是从这里来的。
+      // 为什么选在"换动作的瞬间"、而不是趴着的时候：猫是先淡出、再在新位置以
+      // 新姿势出现，读起来是"溜达到别处去了"；若是趴着不动时凭空消失、又在
+      // 别处出现，就非常突兀（这正是以前要给睡觉等动作逐个 roam:false 的原因）。
+      // 两种情况下不挪：
       //   1) 用户刚点过 —— 点了换动作、结果猫消失，很莫名；
-      //   2) 该动作声明了 roam:false（例如睡觉）—— 趴着的猫瞬移会非常突兀。
-      if (!byUser && a.roam !== false && now >= nextTeleportAllowedAt &&
-          Math.random() < TELEPORT_P) teleport();
+      //   2) 还没过冷却时间 —— 杜绝连续瞬移。
+      if (!byUser && now >= nextTeleportAllowedAt && Math.random() < TELEPORT_P) {
+        teleport(key);                              // 落地后再播新动作
+      } else {
+        render();
+        setAction(key);
+      }
     }
-    nextSwitchAt = now + cfg.switchSec * 1000;      // 重新计时
+    switchSec = rollSwitchSec();                    // 重掷这一轮要停留多久
+    nextSwitchAt = now + switchSec * 1000;          // 重新计时
   }
 
   /* ---------------- 行走 ---------------- */
   /** 走一段；成功起步返回 true，走不动返回 false。
-   *  走的距离按「切换间隔 × 速度」换算 —— 让"走一段"和"站一段"的时长相当，
-   *  用户设的间隔就真的等于换动作的节奏（间隔短就走小步，间隔长就走远些）。 */
+   *  走的距离按「本轮停留时长 × 速度」换算 —— 让"走一段"和"站一段"的时长相当，
+   *  于是停留得久就走得远些，停留得短就是小碎步，整体节奏看着是协调的。 */
   function walkLeg(now) {
     var b = laneBounds(pos.y);
-    var want = Math.max(STEP_MIN, Math.min(STEP_MAX, SPEED * Math.max(1, cfg.switchSec)));
+    var want = Math.max(STEP_MIN, Math.min(STEP_MAX, SPEED * Math.max(1, switchSec)));
     var dir = Math.random() < 0.5 ? -1 : 1;
     var tx = pos.x + dir * want;
     if (tx < b.minX || tx > b.maxX) tx = pos.x - dir * want;   // 撞到边界就折返
@@ -4399,8 +4364,12 @@ main{
     setGhost(false);
   }
 
-  /** 换个地方：淡出 → 随机选新位置 → 淡入，看起来像悄悄挪窝 */
-  function teleport() {
+  /** 换个地方：淡出 → 随机选新位置 → 淡入，看起来像悄悄挪窝。
+   *  landKey：落地后要播的动作。换动作时传新动作，读起来是"溜达到别处、再开始做别的"；
+   *           不传（双击换位置）就保持原来的动作。
+   *  这里不再自己改 nextSwitchAt —— 计时交给调用方统一处理，免得两处各算一次、
+   *  谁后算谁生效，出了怪问题很难查。 */
+  function teleport(landKey) {
     var y = pickLaneY();
     cancelTeleport();
     setGhost(true);
@@ -4415,9 +4384,11 @@ main{
       clampPos();
       render();
       setGhost(false);
-      if (!leg) setAction('idle');     // 换好地方先站住（若已在迈步则不要覆盖走路动画）
+      // 落地后播什么：指定了就播它；没指定（双击换位置）就保持原动作，
+      // 但若原动作是「走路」这类会位移的，腿这时已经断了，退回待机才不会原地迈步。
+      var cur = CAT_ACTIONS[actionKey];
+      setAction(landKey || (cur && cur.moves ? 'idle' : actionKey));
       nextTeleportAllowedAt = performance.now() + TELEPORT_MIN_GAP;
-      nextSwitchAt = performance.now() + cfg.switchSec * 1000;
     }, 170);
   }
 
@@ -4455,8 +4426,9 @@ main{
     // 仅「漫步」模式参与动作轮换；单次动作（睡觉等）靠切换 mode 来接管
     if (mode !== 'roam') return;
 
-    // 到点自动切下一个动作。正在迈步时先让它走完，不打断步伐
-    if (!leg && cfg.switchSec > 0 && now >= nextSwitchAt) advanceAction(now);
+    // 到点自动切下一个动作（每轮停留多久是随机的，见 rollSwitchSec）。
+    // 正在迈步时先让它走完，不打断步伐
+    if (!leg && now >= nextSwitchAt) advanceAction(now);
 
     if (!leg) return;
     var t = (now - leg.start) / leg.dur;
@@ -4465,10 +4437,11 @@ main{
       leg = null;
       render();
       setAction('idle');          // 走完这段就站住
-      // 关键：走完一段后重新起算，让它踏踏实实"待机"满一个间隔。
-      // 否则若这一走比切换间隔还长，切换时间早已过期，
+      // 关键：走完一段后重新起算，让它踏踏实实"待机"满这一轮。
+      // 否则若这一走比本轮停留时长还长，切换时间早已过期，
       // 下一帧会立刻又切去走路 —— 看起来就是"走完马上又走"，没有停顿。
-      nextSwitchAt = now + cfg.switchSec * 1000;
+      switchSec = rollSwitchSec();
+      nextSwitchAt = now + switchSec * 1000;
       return;
     }
     pos.x = leg.from + (leg.to - leg.from) * t;
@@ -4533,20 +4506,30 @@ main{
     nextSwitchAt = performance.now() + DRAG_SETTLE_MS;
   }
 
-  /** 单击猫猫 = 换下一个动作；连点两下 = 召回出生点。
-   *  用一小段延时区分两者，否则双击会被拆成两次「换动作」再回位，很乱。
-   *  baseKey 是按下瞬间的动作，保证"切下一个"的结果可预期。 */
+  /** 单击猫猫 = 换下一个动作；连点两下 = 随机换个位置（不再回出生点）。
+   *  用一小段延时区分两者，否则双击会被拆成两次「换动作」，很乱。
+   *  baseKey 是按下瞬间的动作，保证"切下一个"的结果可预期。
+   *  双击只挪位置、不动动作：猫正在睡觉就让它接着睡，只是换了个地方，
+   *  比"回出生点 + 站直"更像"它自己溜达过去了"。 */
   function onCatClick(baseKey) {
     if (clickTimer) {
       window.clearTimeout(clickTimer);
       clickTimer = 0;
-      goHome();
+      teleportRandom();
       return;
     }
     clickTimer = window.setTimeout(function () {
       clickTimer = 0;
       advanceAction(performance.now(), true, baseKey);
     }, 230);
+  }
+
+  /** 双击用：随机换个位置。
+   *  除了瞬移本身，也把计时重新起算一下 —— 免得刚挪完就紧接着自动换动作，
+   *  用户会以为"我是不是点错了"。 */
+  function teleportRandom() {
+    teleport();                                    // 不传 landKey → 保持当前动作
+    nextSwitchAt = performance.now() + DRAG_SETTLE_MS;
   }
 
   /** 手动换动作时的轻微反馈：猫身闪亮一下，让人知道"点生效了" */
@@ -4566,18 +4549,14 @@ main{
       if (typeof o.on === 'boolean') cfg.on = o.on;
       if (isFinite(o.w)) cfg.w = Math.min(W_MAX, Math.max(W_MIN, +o.w));
       if (isFinite(o.tripSec)) cfg.tripSec = Math.min(T_MAX, Math.max(T_MIN, +o.tripSec));
-      // 老配置里的间隔值可能不是合法档位（比如 45 秒），这里一并吸附过来
-      if (isFinite(o.switchSec)) cfg.switchSec = snapSwitchSec(+o.switchSec);
-      // 一次性迁移：老配置没有 v 字段。若 switchSec 恰好还是当年那个默认值（30 秒），
-      // 说明用户从没手动调过它（应用每次加载都会把默认值写进去），
-      // 这时直接升到新默认值（5 分钟）—— 否则改了默认值，老用户永远看不到效果。
-      if (!(o.v >= CFG_VER) && o.switchSec === SWITCH_SEC_LEGACY) cfg.switchSec = SWITCH_SEC_DEF;
+      // 老存档里可能残留 switchSec / v 字段（那时还有「动作切换」设置项）。
+      // 现在动作节奏由脚本随机决定，这两项直接忽略，不再读取。
     } catch (e) { /* 忽略 */ }
   }
   function saveCfg() {
     try {
       localStorage.setItem(LS_CFG, JSON.stringify({
-        on: cfg.on, w: cfg.w, tripSec: cfg.tripSec, switchSec: cfg.switchSec, v: CFG_VER
+        on: cfg.on, w: cfg.w, tripSec: cfg.tripSec
       }));
     } catch (e) { /* 忽略 */ }
   }
@@ -4616,7 +4595,7 @@ main{
     return null;
   }
 
-  /* ---------------- 召回出生点 ---------------- */
+  /* ---------------- 召回出生点（仅控制台 cat.home() 用；界面入口已移除） ---------------- */
   function goHome() {
     settleUntil = 0;
     leg = null;                    // 必须清掉当前行走段，否则下一帧会把猫拽回原轨迹
@@ -4642,7 +4621,7 @@ main{
     // 结构：容器 → 翻面层（scaleX）→ 图片
     el = document.createElement('div');
     el.className = 'cat';
-    el.title = '单击换动作 · 双击回家 · 按住可拖走';
+    el.title = '单击换动作 · 双击换位置 · 按住可拖走';
     flEl = document.createElement('div');
     flEl.className = 'fl';
     imgEl = document.createElement('img');
@@ -4698,7 +4677,7 @@ main{
     });
 
     /* 控制台微调入口（挂件要反复调，留个手动开关很方便）：
-         cat.home()      回到出生点
+         cat.home()      回到出生点（界面上已无入口，只留给调试）
          cat.pause()     暂停漫步（猫停在原地）
          cat.resume()    继续漫步
          cat.next()      手动换下一个动作（等同于单击猫猫）
@@ -4721,6 +4700,7 @@ main{
           ghosting: ghosting,
           gapLeftMs: Math.round(Math.max(0, nextTeleportAllowedAt - performance.now())),
           nextSwitchInMs: Math.round(Math.max(0, nextSwitchAt - performance.now())),
+          switchSec: +switchSec.toFixed(1),        // 这一轮要停留多久（秒），随机掷出来的
           dragging: dragging,
           paused: paused,
           cfg: this.getConfig()
@@ -4738,7 +4718,7 @@ main{
       /* ---- 供「看板设置」读取 / 修改偏好 ---- */
       getConfig: function () {
         return {
-          on: cfg.on, w: cfg.w, tripSec: cfg.tripSec, switchSec: cfg.switchSec,
+          on: cfg.on, w: cfg.w, tripSec: cfg.tripSec,
           size: { w: size.w, h: size.h }
         };
       },
@@ -4763,22 +4743,18 @@ main{
         cfg.tripSec = Math.min(T_MAX, Math.max(T_MIN, s));
         applyCfg();
       },
-      setSwitchSec: function (sec) {
-        if (!isFinite(+sec)) return;
-        cfg.switchSec = snapSwitchSec(+sec);       // 只接受档位里的值
-        // 改完从"现在"起算，避免设得比上次计时还长之后要干等很久才切
-        nextSwitchAt = performance.now() + cfg.switchSec * 1000;
-        applyCfg();
-      },
 
-      /** 动作切换的档位表（给「看板设置」画滑杆用）：[{sec, label}, ...] */
-      getSwitchOptions: function () {
-        return SWITCH_STEPS.map(function (s) { return { sec: s, label: switchLabel(s) }; });
+      /** 动作停留时长的随机区间（秒）：{min, max}。
+       *  动作节奏刻意不做成设置项，这里只把区间暴露出来，
+       *  方便控制台查看、以及无界面测试推算期望值。 */
+      getSwitchRange: function () {
+        return { min: SWITCH_MIN_SEC, max: SWITCH_MAX_SEC };
       }
     };
 
     // 首次切换稍等一会儿就让它动起来，
     // 免得用户一打开页面就对着一只发呆半分钟的猫
+    switchSec = rollSwitchSec();
     nextSwitchAt = performance.now() + 2500;
     window.requestAnimationFrame(tick);
   }

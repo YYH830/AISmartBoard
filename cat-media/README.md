@@ -121,14 +121,16 @@ python check_action_scale.py ../app/assets/cat idle # 各动作屏幕尺度是�
 2. 在 `../app/index.html` 的 `CAT_ACTIONS` 里加一行：
 
    ```javascript
-   hop: { file: 'cat-hop.webp', moves: false, roam: false, scale: 1.15 }
+   hop: { file: 'cat-hop.webp', moves: false, scale: 1.15 }
    ```
 
    - `moves: true` 只给「会带着猫位移」的动作（目前只有走路）
-   - 趴着不动的动作（睡觉/打瞌睡/洗脸/跳跃）补 `roam: false`，
-     免得猫趴到一半突然淡出又在别处冒出来
    - `scale` 按 `check_action_scale.py` 的建议填
 3. 把它加进 `ROTATION` 数组
+
+> 注：早先每个动作还有 `roam: false`（禁止这个动作期间随机换位置）。
+> 现在改成「只在**切换动作的那一刻**按概率换位置」，猫是先淡出、再在新位置以
+> 新姿势出现，读起来是"溜达到别处去了"，不需要按动作逐个开关，这个字段已删除。
 
 ---
 
@@ -190,11 +192,12 @@ python check_action_scale.py ../app/assets/cat idle # 各动作屏幕尺度是�
 
 | 脚本 | 作用 | 用法 |
 |---|---|---|
-| `test_rotation.js` | 动作轮换逻辑的**无界面回归测试**：把 index.html 里的猫猫 IIFE 抽出来，喂 DOM 桩 + 假时钟，验证切换节奏、手点、拖拽、双击回位等 10 个场景（29 项断言） | `node test_rotation.js` |
+| `test_rotation.js` | 猫猫逻辑的**无界面回归测试**：把 index.html 里的猫猫 IIFE 抽出来，喂 DOM 桩 + 假时钟 + 可编排的假 `Math.random`，验证**随机节奏**、单击换动作/不挪窝、双击换位置、拖拽、以及「动作切换」设置项确已移除，共 9 个场景、31 项断言 | `node test_rotation.js` |
 | `mock-nginx-subpath.js` | 本机模拟 nginx 的 `/board/` 子路径反代，验证**子路径部署**下素材能否正常加载 | `node mock-nginx-subpath.js` |
 
-`test_rotation.js` 改完 `ROTATION` 或切换逻辑后**务必跑一遍**，它的期望值是从
-`index.html` 里读 `ROTATION` 的，加动作不需要改测试本身。
+`test_rotation.js` 改完 `ROTATION`、切换节奏或交互后**务必跑一遍**。它的期望值全部
+从 `index.html` 里解析（`ROTATION` / `SWITCH_MIN_SEC` / `SWITCH_MAX_SEC` / `TELEPORT_P`），
+加动作或调区间都不必改测试本身。失败时退出码为 1，可以直接挂到 CI 上。
 
 ---
 
@@ -283,6 +286,21 @@ python check_action_scale.py ../app/assets/cat idle # 各动作屏幕尺度是�
 容易误以为功能坏了。现在期望值改成从 `index.html` 里读 `ROTATION`，
 **加动作后不必再动测试**。凡是「随动作数量变化」的断言，都该这样推导，不要抄字面值。
 
+### 9. 测随机行为，得先把随机数接管过来
+
+动作停留时长和「要不要换位置」都是随机的。这种逻辑如果直接在测试里跑，
+只能写出"大概也许"的断言（甚至要跑很多次碰运气），失败也无法复现。
+
+做法：把 `Math` 也当成依赖注入进去（`new Function(..., 'Math', ...)`），
+传一个 `Object.create(Math)` 的替身、只把 `random` 换掉——
+- 想要确定性：给个固定值（`() => 0.1` 必定换位置、`() => 0.9` 必定不换）
+- 想验证「确实在随机」：给 mulberry32 之类的**可复现**伪随机，同一颗种子
+  跑出同一条时间线，采样多次看是否出现多个不同取值
+
+顺带一个坑：DOM 桩里的 `clearTimeout` 必须**真的能取消**定时器。
+双击要靠 `clearTimeout` 掐掉「单击换动作」那个延时器；桩里如果写成空函数，
+被取消的那次换动作还会照跑，断言就会莫名其妙地失败。
+
 ---
 
 ## 七、交付前质检清单
@@ -330,3 +348,26 @@ for i in range(n):
 | `sleep` | 睡觉 | 259×143 | 28 | 1.28 | 趴卧最扁，需要补偿 |
 
 轮换顺序（`ROTATION`）：`idle → walk → hop → stretch → groom → doze → sleep`
+
+## 九、猫猫的交互与随机行为
+
+设置面板里只有 **开关 / 大小 / 移动速度** 三项（猫猫脚本里对应 `cfg.w` / `cfg.tripSec`）。
+动作节奏和位置**刻意不做成设置项**，都是随机的：
+
+| 行为 | 现状 | 代码位置 |
+|---|---|---|
+| 每个动作停留多久 | 每轮从 **20~150 秒**随机掷（均值约 85 秒） | `SWITCH_MIN_SEC` / `SWITCH_MAX_SEC` |
+| 换动作时是否换位置 | **50%** 概率「溜达到别处」，位置也随机 | `TELEPORT_P` / `teleport()` |
+| 单击猫猫 | 立刻换下一个动作（并重新计时） | `onCatClick()` |
+| 双击猫猫 | **随机换个位置**（不回出生点，动作保持不变） | `teleportRandom()` |
+| 按住拖拽 | 拖到任意位置，松手后记住 | `onDown/onMove/onUp` |
+| `cat.home()` | 回出生点。界面上已无入口，只留给控制台调试 | `goHome()` |
+
+两个设计要点，改之前务必理解：
+
+1. **换个地方发生在「切换动作的那一刻」**，不是趴着不动的时候凭空消失。
+   猫是先淡出、再在新位置以新姿势出现，读起来是"溜达到别处去了"。
+   正因为如此，才不需要按动作逐个 `roam: false`（那个字段已删除）。
+2. **随机数可以外包给测试**。`rollSwitchSec()` 用的是全局 `Math.random`，
+   而 `test_rotation.js` 会把 `Math` 整个注入成替身，
+   于是"随机"在测试里变成确定性的 —— 详见第六节坑 9。
