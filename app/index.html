@@ -186,9 +186,6 @@ main{
 .btn:active{transform:translateY(0)}
 .btn.icon{width:34px;padding:0;justify-content:center}
 .btn svg{width:15px;height:15px;flex:none}
-.btn.icon .ico-sun{display:none}
-[data-theme="dark"] .btn.icon .ico-moon{display:none}
-[data-theme="dark"] .btn.icon .ico-sun{display:block}
 .btn.primary{
   background:linear-gradient(140deg,var(--brand-1),var(--brand-2));border-color:transparent;color:#fff;
   box-shadow:0 12px 24px -14px var(--brand-1);
@@ -469,6 +466,85 @@ main{
 .modal-foot{flex:none;display:flex;align-items:center;gap:10px;padding:14px 22px 16px;border-top:1px solid var(--line);flex-wrap:wrap;row-gap:10px}
 .hintline{font-size:11.5px;color:var(--text-mute);line-height:1.7}
 .modal.mini{width:min(430px,92vw)}
+
+/* ============ 看板设置弹窗：标签页 / 设置块 / 开关 / 滑杆 ============
+   命名约定：自定义类一律加 set- 前缀或限定在 .setmodal 内，
+            避免与工程里既有的 .tabs（面板头部标签条）等类名撞车。 */
+/* 固定宽高：三个标签页内容多少不一，尺寸固定后切换才不会跳动 */
+.modal.setmodal{width:min(524px,94vw);height:min(636px,88vh)}
+
+/* 标签页 */
+.set-tabs{display:flex;gap:4px;padding:0 20px;border-bottom:1px solid var(--line);flex-wrap:wrap;row-gap:4px}
+.set-tabs button{
+  position:relative;padding:11px 14px 13px;font-size:13.5px;color:var(--text-mute);
+  border:0;background:transparent;border-radius:9px 9px 0 0;transition:.16s;white-space:nowrap;
+}
+.set-tabs button:hover{color:var(--text)}
+.set-tabs button.on{color:var(--text);font-weight:660}
+.set-tabs button.on::after{
+  content:"";position:absolute;left:13px;right:13px;bottom:-1px;height:2px;border-radius:2px;
+  background:linear-gradient(90deg,var(--brand-1),var(--brand-2));
+}
+
+/* 内容区：加大上内边距，让标签页与内容之间有呼吸空间 */
+.setmodal .modal-body{padding:20px 20px 8px}
+
+.tabpane{display:none}
+.tabpane.on{display:block;animation:fade .18s both}
+
+/* 设置块：每块一张独立卡片，块与块之间留白，避免内容挤成一团 */
+.setblock{
+  padding:17px 18px 18px;margin:0 0 15px;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:16px;
+}
+.setmodal .tabpane>.setblock:last-child{margin-bottom:0}
+
+/* 设置标题：左侧色条 + 加重字重，比普通 label 明显得多 */
+.setblock-title{
+  display:flex;align-items:center;gap:9px;margin:0 0 14px;
+  font-size:14px;font-weight:700;color:var(--text);letter-spacing:.2px;
+}
+.setblock-title::before{
+  content:"";flex:none;width:3px;height:15px;border-radius:2px;
+  background:linear-gradient(180deg,var(--brand-1),var(--brand-2));
+}
+.setblock .hintline{margin-top:8px}
+
+/* 底部按钮组：只显示当前标签页那一组 */
+.modal-foot>.tabfoot{display:none;width:100%;align-items:center;gap:10px}
+.modal-foot>.tabfoot.on{display:flex}
+
+/* 开关（iOS 风格）。开关落在浅色卡片上，底色要用页面底色才看得出轮廓 */
+.switchrow{display:flex;align-items:center;gap:14px}
+.switchrow .switchtext{flex:1;min-width:0}
+.switchtitle{font-size:13.5px;font-weight:600;color:var(--text);margin-bottom:4px}
+.switch{
+  flex:none;width:44px;height:25px;border-radius:20px;padding:2px;
+  background:var(--bg-1);border:1px solid var(--line);cursor:pointer;transition:.2s;
+}
+.switch i{display:block;width:19px;height:19px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(40,28,18,.28)}
+.switch[aria-checked="true"]{background:linear-gradient(140deg,var(--brand-1),var(--brand-2));border-color:transparent}
+.switch[aria-checked="true"] i{transform:translateX(19px)}
+
+/* 子设置项（猫猫大小 / 移动速度）：用虚线分隔线与上方开关行分开 */
+.subfields{margin-top:15px;padding-top:15px;border-top:1px dashed var(--line)}
+.subrow{display:flex;align-items:center;gap:13px}
+.subrow+.subrow{margin-top:13px}
+.sublabel{flex:none;width:60px;font-size:12.5px;font-weight:600;color:var(--text-dim)}
+
+/* 滑杆 */
+.subrow input[type=range]{flex:1;min-width:0;height:22px;accent-color:var(--brand-1);cursor:pointer}
+.subrow .val{
+  flex:none;min-width:68px;text-align:center;font-size:12px;font-weight:600;color:var(--brand-1);
+  background:var(--bg-1);border:1px solid var(--line);border-radius:8px;padding:4px 8px;
+  font-variant-numeric:tabular-nums;
+}
+/* 猫猫关闭时，大小/速度两项变灰不可点 */
+#setCatOpts.off{opacity:.42;pointer-events:none}
+
+/* 设置块内的表单字段（AI 标签页）：标签加重一档，与块标题形成层级 */
+.setblock .field{margin-bottom:14px}
+.setblock .field>label{font-size:12.5px;font-weight:600;color:var(--text-dim);margin-bottom:8px}
 
 /* ============================== 台账侧边栏 ============================== */
 .sidebar{
@@ -781,6 +857,39 @@ main{
   .ai-dock{right:12px;left:12px;width:auto;bottom:84px;height:min(72vh,560px)}
   .ai-fab{right:15px;bottom:15px}
 }
+
+/* ============================== 桌宠：猫猫挂件 ==============================
+   一个覆盖全屏的透明层，猫在里面自由走动。
+   要点：
+   1) 层本身 pointer-events:none，绝不挡界面；只有猫自己可点（用于拖拽）；
+   2) 层级 90 —— 在弹窗（120）/侧边栏（105）之下，在 AI 悬浮球（80）之上；
+   3) 位置全部由 JS 计算（left/top + transform），不加 CSS 动画，方便后续接更多状态。
+   ========================================================================== */
+#catLayer{
+  position:fixed;inset:0;z-index:90;pointer-events:none;overflow:hidden;
+}
+#catLayer .cat{
+  position:absolute;left:0;top:0;width:72px;      /* 猫的显示宽度，行高由 100:96 素材比例决定 */
+  pointer-events:auto;cursor:grab;touch-action:none;
+  transition:opacity .16s ease;
+  will-change:transform;
+}
+#catLayer .cat.ghost{opacity:0}                    /* 瞬移时短暂隐去，避免"闪一下"的突兀感 */
+#catLayer .cat.dragging{cursor:grabbing;transition:none}
+#catLayer .cat .fl{display:block;transform-origin:50% 50%}  /* 翻面容器：朝左走时 scaleX(-1) */
+/* 单击换动作时的轻微反馈。这里只动 filter 不动 transform，
+   免得和"翻面 scaleX(-1)"以及 JS 的 translate 定位打架 */
+#catLayer .cat.flash .fl{animation:catFlash .3s ease}
+@keyframes catFlash{0%{filter:brightness(1)}45%{filter:brightness(1.4)}100%{filter:brightness(1)}}
+#catLayer .cat img{
+  width:100%;height:auto;display:block;pointer-events:none;
+  user-select:none;-webkit-user-drag:none;
+  filter:drop-shadow(0 3px 4px rgba(80,50,25,.28));
+}
+/* 尊重系统「减弱动态效果」偏好：直接不显示，避免打扰 */
+@media (prefers-reduced-motion:reduce){
+  #catLayer{display:none}
+}
 </style>
 </head>
 <body>
@@ -805,11 +914,7 @@ main{
     <div class="spacer"></div>
     <div class="actions">
       <div class="savedot" id="savedot"><i></i><span id="savetext">就绪</span></div>
-      <button class="btn icon" id="btnTheme" title="切换深色 / 浅色主题">
-        <svg class="ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-        <svg class="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg>
-      </button>
-      <button class="btn acct" id="btnAcct" title="账号" style="display:none">
+      <button class="btn acct" id="btnAcct" title="账号（看板设置 / 退出登录）" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5.5 19.5c1.1-3.4 3.6-5.2 6.5-5.2s5.4 1.8 6.5 5.2"/></svg>
         <span id="acctName">账号</span>
       </button>
@@ -849,7 +954,6 @@ main{
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
         </button>
         <button class="btn sm plain" id="btnToday">今天</button>
-        <button class="icon-btn" id="btnCalSet" title="日历设置（排期方式 / 任务条展示字段）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
         <div class="spacer"></div>
         <div class="chips">
           <div class="chip"><span class="dot todo"></span>未完成</div>
@@ -924,7 +1028,6 @@ main{
       <button class="icon-btn" id="aiHistBtn" title="历史记录">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4.5l3 1.8"/></svg>
       </button>
-      <button class="icon-btn" id="aiSetBtn" title="AI 设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
       <button class="icon-btn" id="aiDockClose" title="关闭">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
@@ -945,23 +1048,119 @@ main{
     </form>
   </div>
 
-  <!-- ================= AI 设置 ================= -->
-  <div class="backdrop" id="aiSetBackdrop" style="display:none">
-    <div class="modal mini">
-      <div class="modal-head"><h3>AI 设置</h3><button class="icon-btn" id="aiSetClose" title="关闭">✕</button></div>
-      <div class="modal-body">
-        <div class="hintline" id="aiAcctHint" style="margin-bottom:12px"></div>
-        <div class="field"><label>服务商</label><select id="aiProvider"></select></div>
-        <div class="field"><label>模型名称</label><input type="text" id="aiModel" list="aiModelList" placeholder="DeepSeek-V4.1-Flash"><datalist id="aiModelList"></datalist></div>
-        <div class="field"><label>API Base URL</label><input type="text" id="aiBase" placeholder="https://api.deepseek.com/v1"></div>
-        <div class="field"><label>API Key</label><input type="text" id="aiKey" placeholder="留空表示不修改" autocomplete="off"><div class="hintline" id="aiKeyHint"></div></div>
-        <div class="hintline" id="aiSetHint"></div>
+  <!-- ================= 看板设置（统一入口：个性化 / 日历 / AI） =================
+       三个标签页共用这一个弹窗，后续要加设置项直接加标签页即可。
+       注意：AI 与日历的表单元素 ID 沿用旧值，避免改动既有的读写逻辑。 -->
+  <div class="backdrop" id="boardSetBackdrop" style="display:none">
+    <div class="modal setmodal">
+      <div class="modal-head">
+        <h3>看板设置</h3>
+        <button class="icon-btn" id="boardSetClose" title="关闭">✕</button>
       </div>
+
+      <!-- 标签页 -->
+      <div class="set-tabs" id="boardSetTabs">
+        <button type="button" data-tab="personal" class="on">个性化设置</button>
+        <button type="button" data-tab="calendar">日历设置</button>
+        <button type="button" data-tab="ai">AI 设置</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- ---------- 个性化设置 ---------- -->
+        <div class="tabpane on" data-pane="personal">
+          <section class="setblock">
+            <h4 class="setblock-title">皮肤</h4>
+            <div class="seg" id="setTheme">
+              <button type="button" data-theme="light">浅色</button>
+              <button type="button" data-theme="dark">深色</button>
+            </div>
+            <div class="hintline">切换后立即生效，并会自动记住你的选择。</div>
+          </section>
+
+          <section class="setblock">
+            <h4 class="setblock-title">桌宠猫猫</h4>
+            <div class="switchrow">
+              <div class="switchtext">
+                <div class="switchtitle">在日历上显示猫猫</div>
+                <div class="hintline">关掉后猫猫就不再出现，也不会占用任何界面操作。</div>
+              </div>
+              <button type="button" class="switch" id="setCatOn" role="switch" aria-checked="true"><i></i></button>
+            </div>
+
+            <!-- 猫猫关闭时整块置灰（见 #setCatOpts.off 样式） -->
+            <div class="subfields" id="setCatOpts">
+              <div class="subrow">
+                <span class="sublabel">猫猫大小</span>
+                <input type="range" id="setCatSize" min="28" max="120" step="2" value="72">
+                <span class="val" id="setCatSizeVal">72 px</span>
+              </div>
+              <div class="subrow">
+                <span class="sublabel">移动速度</span>
+                <input type="range" id="setCatSpeed" min="6" max="120" step="2" value="60">
+                <span class="val" id="setCatSpeedVal">60 秒</span>
+              </div>
+              <div class="subrow">
+                <span class="sublabel">动作切换</span>
+                <input type="range" id="setCatSwitch" min="0" max="7" step="1" value="5">
+                <span class="val" id="setCatSwitchVal">5 分钟</span>
+              </div>
+              <div class="hintline">
+                移动速度 = 猫猫走完「一个日历面板宽度」所需的秒数；数值越大走得越慢，往左拖即走得更快。
+              </div>
+              <div class="hintline">
+                动作切换 = 每隔多久换一个动作（待机 ↔ 走路），可选「不自动切换」到 30 分钟。
+                平时随时单击猫猫也能立刻换下一个动作，双击召回原位，按住可以把猫拖到别处。
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- ---------- 日历设置 ---------- -->
+        <div class="tabpane" data-pane="calendar">
+          <section class="setblock">
+            <h4 class="setblock-title">排期计算方式</h4>
+            <div class="seg" id="calSchedMode">
+              <button type="button" data-mode="natural">自然日</button>
+              <button type="button" data-mode="workday">工作日（跳周末+节假日）</button>
+            </div>
+            <div class="hintline">拖任务到日历时：自然日按连续天数占位；工作日会跳过周末和法定节假日。</div>
+          </section>
+          <section class="setblock">
+            <h4 class="setblock-title">任务条展示字段</h4>
+            <div class="fchips" id="calFields"></div>
+            <div class="hintline">任务名称始终展示；再勾选优先级 / 标签 / 人天，日历上的任务条会一并显示。</div>
+          </section>
+        </div>
+
+        <!-- ---------- AI 设置 ---------- -->
+        <div class="tabpane" data-pane="ai">
+          <section class="setblock">
+            <h4 class="setblock-title">模型服务</h4>
+            <div class="hintline" id="aiAcctHint"></div>
+            <div class="field"><label>服务商</label><select id="aiProvider"></select></div>
+            <div class="field"><label>模型名称</label><input type="text" id="aiModel" list="aiModelList" placeholder="DeepSeek-V4.1-Flash"><datalist id="aiModelList"></datalist></div>
+            <div class="field"><label>API Base URL</label><input type="text" id="aiBase" placeholder="https://api.deepseek.com/v1"></div>
+            <div class="field"><label>API Key</label><input type="text" id="aiKey" placeholder="留空表示不修改" autocomplete="off"><div class="hintline" id="aiKeyHint"></div></div>
+          </section>
+          <div class="hintline" id="aiSetHint"></div>
+        </div>
+      </div>
+
+      <!-- 底部按钮：随当前标签页切换 -->
       <div class="modal-foot">
-        <button class="btn" id="aiTest">测试连接</button>
-        <div class="spacer"></div>
-        <button class="btn" id="aiSetCancel">取消</button>
-        <button class="btn primary" id="aiSave">保存</button>
+        <div class="tabfoot on" data-foot="personal">
+          <div class="spacer"></div>
+          <button class="btn primary" data-boardset-close>完成</button>
+        </div>
+        <div class="tabfoot" data-foot="calendar">
+          <div class="spacer"></div>
+          <button class="btn primary" data-boardset-close>完成</button>
+        </div>
+        <div class="tabfoot" data-foot="ai">
+          <button class="btn" id="aiTest">测试连接</button>
+          <div class="spacer"></div>
+          <button class="btn primary" id="aiSave">保存</button>
+        </div>
       </div>
     </div>
   </div>
@@ -976,29 +1175,6 @@ main{
         <div class="spacer"></div>
         <button class="btn" id="aiHistClose2">关闭</button>
       </div>
-    </div>
-  </div>
-
-  <!-- ================= 日历设置 ================= -->
-  <div class="backdrop" id="calSetBackdrop" style="display:none">
-    <div class="modal mini">
-      <div class="modal-head"><h3>日历设置</h3><button class="icon-btn" id="calSetClose" title="关闭">✕</button></div>
-      <div class="modal-body">
-        <div class="fgroup">
-          <label>排期计算方式</label>
-          <div class="seg" id="calSchedMode">
-            <button type="button" data-mode="natural">自然日</button>
-            <button type="button" data-mode="workday">工作日（跳周末+节假日）</button>
-          </div>
-          <div class="hintline" style="margin-top:8px">拖任务到日历时：自然日按连续天数占位；工作日会跳过周末和法定节假日。</div>
-        </div>
-        <div class="fgroup">
-          <label>任务条展示字段</label>
-          <div class="fchips" id="calFields"></div>
-          <div class="hintline" style="margin-top:8px">任务名称始终展示；再勾选优先级 / 标签 / 人天，日历上的任务条会一并显示。</div>
-        </div>
-      </div>
-      <div class="modal-foot"><div class="spacer"></div><button class="btn primary" id="calSetOk">完成</button></div>
     </div>
   </div>
 
@@ -1101,6 +1277,9 @@ main{
 </div>
 
 <div class="toasts" id="toasts"></div>
+
+<!-- 桌宠层：猫猫挂件。全屏透明覆盖层（pointer-events:none），由页面末尾的脚本驱动 -->
+<div id="catLayer" aria-hidden="true"></div>
 
 <script>
 /* ============================================================================
@@ -2142,12 +2321,87 @@ main{
   }
 
   /** 更新「排期计算方式」按钮上的文字 */
-  /** 日历设置弹窗 */
-  function openCalSettings() {
-    renderCalSettings();
-    $('calSetBackdrop').style.display = 'grid';
+  /* ============================================================================
+   * 看板设置：统一入口，内含「个性化设置 / 日历设置 / AI 设置」三个标签页。
+   * 入口在顶栏账号菜单里（点账号 → 看板设置）。后续新增设置项，加一个标签页即可。
+   * ========================================================================== */
+  let boardSetTab = 'personal';
+
+  /** 打开看板设置并定位到指定标签页：'personal' | 'calendar' | 'ai' */
+  function openBoardSettings(tab) {
+    setBoardSetTab(tab || boardSetTab);
+    if (boardSetTab === 'calendar') renderCalSettings();
+    if (boardSetTab === 'personal') { renderThemeSetting(); renderCatSetting(); }
+    $('boardSetBackdrop').style.display = 'grid';
   }
-  function closeCalSettings() { $('calSetBackdrop').style.display = 'none'; }
+  function closeBoardSettings() { $('boardSetBackdrop').style.display = 'none'; }
+
+  /** 切换标签页（标签、面板、底部按钮组三者联动） */
+  function setBoardSetTab(tab) {
+    boardSetTab = tab;
+    document.querySelectorAll('#boardSetTabs button').forEach((b) => {
+      b.classList.toggle('on', b.dataset.tab === tab);
+    });
+    document.querySelectorAll('#boardSetBackdrop .tabpane').forEach((p) => {
+      p.classList.toggle('on', p.dataset.pane === tab);
+    });
+    document.querySelectorAll('#boardSetBackdrop .tabfoot').forEach((f) => {
+      f.classList.toggle('on', f.dataset.foot === tab);
+    });
+    // 切到 AI 标签页时，让 AI 模块把配置拉回来（服务商 / 模型 / Key 状态）
+    if (tab === 'ai' && window.__wtkLoadAiConfig) window.__wtkLoadAiConfig();
+  }
+
+  /** 应用皮肤并同步选择状态（立即生效 + 记住） */
+  function applyTheme(next) {
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('wtk-theme', next); } catch (e) { /* 忽略 */ }
+    renderThemeSetting();
+  }
+  function renderThemeSetting() {
+    const cur = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+    const box = $('setTheme');
+    if (box) Array.prototype.forEach.call(box.querySelectorAll('[data-theme]'), (b) => {
+      b.classList.toggle('on', b.dataset.theme === cur);
+    });
+  }
+
+  /** 猫猫「动作切换」的档位表（含显示文案），懒加载一次并缓存。
+   *  档位定义在猫猫脚本里（那边是唯一数据源），这里只负责画滑杆，避免两处写死以后对不上。 */
+  let _catSwitchOpts = null;
+  function catSwitchOpts() {
+    if (!_catSwitchOpts && window.cat && window.cat.getSwitchOptions) {
+      _catSwitchOpts = window.cat.getSwitchOptions();
+    }
+    return _catSwitchOpts;
+  }
+
+  /** 把猫猫配置回填到设置面板（猫猫脚本未就绪时静默跳过） */
+  function renderCatSetting() {
+    const c = (window.cat && window.cat.getConfig) ? window.cat.getConfig() : null;
+    if (!c) return;
+    const on = !!c.on;
+    $('setCatOn').setAttribute('aria-checked', on ? 'true' : 'false');
+    $('setCatOpts').classList.toggle('off', !on);       // 关掉猫猫后，大小/速度等置灰
+    $('setCatSize').value = c.w;
+    $('setCatSizeVal').textContent = c.w + ' px';
+    $('setCatSpeed').value = c.tripSec;
+    $('setCatSpeedVal').textContent = c.tripSec + ' 秒';
+
+    // 动作切换：档位表决定滑杆的刻度数，当前值反查出下标
+    const opts = catSwitchOpts();
+    if (opts && opts.length) {
+      const input = $('setCatSwitch');
+      input.max = opts.length - 1;
+      let idx = opts.findIndex((o) => o.sec === c.switchSec);
+      if (idx < 0) {                                    // 配置里是个意外值：吸附到最近档位
+        let bd = Infinity;
+        opts.forEach((o, i) => { const d = Math.abs(o.sec - c.switchSec); if (d < bd) { bd = d; idx = i; } });
+      }
+      input.value = idx;
+      $('setCatSwitchVal').textContent = opts[idx].label;
+    }
+  }
   function renderCalSettings() {
     const seg = $('calSchedMode');
     if (seg) Array.prototype.forEach.call(seg.querySelectorAll('[data-mode]'), (b) => { b.classList.toggle('on', (b.dataset.mode === 'workday') === (schedMode === 'workday')); });
@@ -2941,7 +3195,7 @@ main{
   }
 
   /**
-   * 账号入口：顶栏显示登录账号，点开提供「退出登录」。
+   * 账号入口：顶栏显示登录账号，点开后统一提供「看板设置」与「退出登录」。
    * 说明：看板由服务器长期托管，页面无需再展示服务状态等信息。
    */
   function openAccountMenu() {
@@ -2955,6 +3209,7 @@ main{
     m.id = 'acctMenu';
     const name = $('acctName') ? $('acctName').textContent : '';
     m.innerHTML = '<div class="acct-menu-name">' + esc(name) + '</div>' +
+                  '<button class="btn" data-acct-settings="1">看板设置</button>' +
                   '<button class="btn" data-acct-logout="1">退出登录</button>';
     document.body.appendChild(m);
 
@@ -2968,6 +3223,11 @@ main{
       }
     };
     setTimeout(() => document.addEventListener('click', off, true), 0);
+
+    m.querySelector('[data-acct-settings]').onclick = () => {
+      m.remove();
+      openBoardSettings('personal');
+    };
 
     m.querySelector('[data-acct-logout]').onclick = async () => {
       m.remove();
@@ -3047,6 +3307,9 @@ main{
   }
   // 暴露给第二段脚本（AI 分析）复用，保证删除操作风格统一
   window.__wtkConfirmDelete2 = confirmDelete2;
+  // 「看板设置」也需被第二段脚本唤起（AI 设置是它的一个标签页）
+  window.openBoardSettings = openBoardSettings;
+  window.closeBoardSettings = closeBoardSettings;
 
   /** 删除团队看板（侧边栏 / 团队设置共用） */
   async function deleteTeamBoard(id, name) {
@@ -3085,10 +3348,51 @@ main{
     $('btnPrev').onclick = () => changeMonth(-1);
     $('btnNext').onclick = () => changeMonth(1);
     $('btnToday').onclick = () => { view.ym = today().slice(0, 7); renderCalendar(); renderStats(); };
-    $('btnCalSet').onclick = openCalSettings;
-    $('calSetClose').onclick = closeCalSettings;
-    $('calSetOk').onclick = closeCalSettings;
-    $('calSetBackdrop').addEventListener('click', (e) => { if (e.target === $('calSetBackdrop')) closeCalSettings(); });
+    // 日历设置已并入「看板设置」弹窗，入口改为 账号菜单 → 看板设置
+    $('boardSetTabs').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-tab]');
+      if (b) setBoardSetTab(b.dataset.tab);
+    });
+    $('boardSetClose').onclick = closeBoardSettings;
+    Array.prototype.forEach.call(document.querySelectorAll('#boardSetBackdrop [data-boardset-close]'), (b) => {
+      b.onclick = closeBoardSettings;
+    });
+    $('boardSetBackdrop').addEventListener('click', (e) => {
+      if (e.target === $('boardSetBackdrop')) closeBoardSettings();
+    });
+
+    // 皮肤（浅色 / 深色）
+    $('setTheme').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-theme]');
+      if (b) applyTheme(b.dataset.theme);
+    });
+
+    // 猫猫：开关 / 大小 / 速度（全部即时生效并记住）
+    $('setCatOn').onclick = () => {
+      const on = $('setCatOn').getAttribute('aria-checked') !== 'true';
+      if (window.cat && window.cat.setEnabled) window.cat.setEnabled(on);
+      renderCatSetting();
+      toast(on ? '猫猫已开启' : '猫猫已关闭');
+    };
+    $('setCatSize').addEventListener('input', (e) => {
+      const w = +e.target.value;
+      $('setCatSizeVal').textContent = w + ' px';
+      if (window.cat && window.cat.setWidth) window.cat.setWidth(w);
+    });
+    $('setCatSpeed').addEventListener('input', (e) => {
+      const s = +e.target.value;
+      $('setCatSpeedVal').textContent = s + ' 秒';
+      if (window.cat && window.cat.setTripSec) window.cat.setTripSec(s);
+    });
+    $('setCatSwitch').addEventListener('input', (e) => {
+      const opts = catSwitchOpts();
+      if (!opts) return;
+      const o = opts[+e.target.value];
+      if (!o) return;
+      $('setCatSwitchVal').textContent = o.label;
+      if (window.cat && window.cat.setSwitchSec) window.cat.setSwitchSec(o.sec);
+    });
+
     $('calSchedMode').addEventListener('click', (e) => {
       const b = e.target.closest('[data-mode]');
       if (!b) return;
@@ -3276,12 +3580,7 @@ main{
       markDirty();
       toast('已按状态排序');
     };
-    $('btnTheme').onclick = () => {
-      const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
-      document.documentElement.dataset.theme = next;
-      localStorage.setItem('wtk-theme', next);
-    };
-    // 本地服务管理（状态 / 重启 / 停止）
+    // 顶栏不再放主题按钮，皮肤改到「看板设置 → 个性化设置」里
     $('btnAcct').onclick = openAccountMenu;
     $('btnBind').onclick = async () => {
       try {
@@ -3596,6 +3895,9 @@ main{
     }).join('');
   }
 
+  // 暴露给第一段脚本：切到「看板设置 → AI 设置」标签页时，需要重新拉一次配置
+  window.__wtkLoadAiConfig = loadConfig;
+
   function currentProvider() {
     return providers.filter(function (x) { return x.id === $('aiProvider').value; })[0] || null;
   }
@@ -3611,12 +3913,17 @@ main{
       : '尚未配置，请填入 API Key';
   }
 
+  /** 打开「看板设置」并直接定位到 AI 标签页
+   *  配置拉取交给 setBoardSetTab 的切页钩子，避免两处重复请求 */
   function openSettings() {
     $('aiSetHint').textContent = '';
     $('aiKey').value = '';
-    $('aiSetBackdrop').style.display = 'grid';
+    if (window.openBoardSettings) window.openBoardSettings('ai');
   }
-  function closeSettings() { $('aiSetBackdrop').style.display = 'none'; }
+  /** 关闭「看板设置」弹窗（AI 保存成功后会自动收起） */
+  function closeSettings() {
+    if (window.closeBoardSettings) window.closeBoardSettings();
+  }
 
   async function postConfig() {
     var r = await fetch('/api/ai/config', {
@@ -3722,12 +4029,9 @@ main{
     };
 
 
-    $('aiSetBtn').onclick = openSettings;
-    $('aiSetClose').onclick = closeSettings;
-    $('aiSetCancel').onclick = closeSettings;
+    // AI 设置已并入「看板设置」弹窗，入口在 账号菜单 → 看板设置 → AI 设置
     $('aiSave').onclick = saveSettings;
     $('aiTest').onclick = testConnection;
-    $('aiSetBackdrop').addEventListener('click', function (e) { if (e.target === this) closeSettings(); });
     $('aiProvider').addEventListener('change', function () {
       var pr = currentProvider();
       if (pr) { $('aiBase').value = pr.baseUrl || ''; if (pr.models && pr.models[0]) $('aiModel').value = pr.models[0]; }
@@ -3762,6 +4066,667 @@ main{
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
   else bind();
+})();
+</script>
+
+<script>
+/* ============================================================================
+ * 桌宠：猫猫挂件
+ * ----------------------------------------------------------------------------
+ * 行为：
+ *   · 出生点 —— 日历面板上边框、LOGO 与看板名称的右侧（不会挡住 LOGO）
+ *   · 动作轮换 —— 按 ROTATION 顺序循环播放动作（待机 ↔ 走路…），
+ *                 默认每 5 分钟换一个（可在「看板设置 → 个性化」里按档位调，
+ *                 「不自动切换」到 30 分钟共 8 档）；
+ *                 会位移的动作会真的走一段，距离按间隔换算
+ *   · 单击   —— 立刻换下一个动作（并重新计时）
+ *   · 双击   —— 召回默认出生点
+ *   · 拖拽   —— 按住猫可拖到任意位置，松手后位置记入 localStorage('wtk-cat')
+ *   · 避让   —— 当猫身在竖直方向会盖到顶栏时，自动把活动范围收在
+ *               「LOGO/标题」与「右侧按钮区」之间的空档里，绝不遮挡 LOGO 和名称
+ * 扩展：
+ *   以后要加「睡觉 / 舔毛」等动图，把素材放进 app/assets/cat/，
+ *   在 CAT_ACTIONS 里加一行、并把它加进 ROTATION 即可（原地动作写 moves:false）。
+ *   素材打包约定：动画帧对齐后「贴紧猫体」裁掉留白，保证各动作里
+ *   猫占画幅的比例一致，否则切换动作时猫会突然变大变小。
+ * ========================================================================== */
+(function () {
+  'use strict';
+
+  /* ---------------- 可调参数 ---------------- */
+  var CAT_W_DEF  = 72;                      // 猫的默认显示宽度（px）
+  var TRIP_SEC_DEF = 60;                    // 默认速度：走完「一个日历面板宽度」所需秒数
+  var W_MIN = 28, W_MAX = 120;              // 大小可选范围（px），与设置面板的滑杆一致
+  var T_MIN = 6,  T_MAX = 120;              // 速度可选范围（秒），同上
+  var REF_DIST   = 536;                     // 换算速度的基准距离（px）
+  var ASSET_RATIO = 96 / 100;               // 素材宽高比（100x96），载入后按真实尺寸校正
+  var STEP_MIN   = 24;                      // 单次行走最短距离（px）：间隔设得很短时就是小碎步
+  var STEP_MAX   = 520;                     // 单次行走最长距离（px）：间隔设得很大时也别横穿整个屏幕
+  var TELEPORT_P = 0.5;                     // 站着待机时「悄悄换个地方」的概率（调小 = 更安分）
+  var TELEPORT_MIN_GAP = 30000;             // 两次「换个地方」之间的最小间隔（ms），杜绝连续瞬移
+  var DRAG_SETTLE_MS   = 1500;              // 拖拽松手后的安顿时间：先在落点站定，再开始走
+  var EDGE       = 6;                       // 与视口左右边缘的留白（px）
+  var ASSET_DIR  = '/assets/cat/';          // 素材目录（由 server.js 静态提供）
+  var LS_KEY     = 'wtk-cat';               // 位置持久化 key
+  var LS_CFG     = 'wtk-cat-config';        // 外观 / 行为偏好持久化 key
+
+  /* 动作自动切换的可选档位（秒），0 = 不自动切换。
+     设置面板的滑杆用的是「档位下标」而不是秒数本身：
+     档位跨越 10 秒 ~ 30 分钟这么宽的范围，若直接用秒数做线性滑杆，
+     几十秒那一段会被压得只剩几个像素、根本拖不准。 */
+  var SWITCH_STEPS = [0, 10, 30, 60, 120, 300, 600, 1800];
+  var SWITCH_SEC_DEF = 300;                 // 默认切换间隔（秒）：5 分钟
+  var SWITCH_SEC_LEGACY = 30;               // 曾经的默认值，仅用于老配置迁移
+  var CFG_VER = 1;                          // 配置版本号，配合一次性迁移使用
+
+  /** 把任意秒数吸附到最接近的档位，保证配置里只存合法档位 */
+  function snapSwitchSec(sec) {
+    var best = SWITCH_STEPS[0], bd = Infinity;
+    for (var i = 0; i < SWITCH_STEPS.length; i++) {
+      var d = Math.abs(SWITCH_STEPS[i] - sec);
+      if (d < bd) { bd = d; best = SWITCH_STEPS[i]; }
+    }
+    return best;
+  }
+
+  /** 档位的显示文案：0 → 不自动切换，60 以内用秒，再往上用分钟 */
+  function switchLabel(sec) {
+    if (!sec) return '不自动切换';
+    if (sec < 60) return sec + ' 秒';
+    return (sec / 60) + ' 分钟';
+  }
+
+  /** 用户可配置项（「看板设置 → 个性化设置」里改，立即生效并记住） */
+  var cfg = { on: true, w: CAT_W_DEF, tripSec: TRIP_SEC_DEF, switchSec: SWITCH_SEC_DEF };
+  var SPEED   = REF_DIST / cfg.tripSec;     // 行走速度（px/s），由 tripSec 换算
+  var ratio   = ASSET_RATIO;                // 实际宽高比，图片载入后校正
+  var assetOk = true;                       // 素材加载失败时置 false，避免显示破图
+  var broken  = {};                         // 记录加载失败的动作素材，避免反复重试破图
+
+  /* 动作表：key -> { file, moves }
+       moves:true  → 该动作会带着猫位移（走路）
+       moves:false → 原地动作（待机，以后的睡觉 / 舔毛等）
+     新增动作：把素材丢进 app/assets/cat/，这里加一行，再加进下面的 ROTATION 即可。 */
+  var CAT_ACTIONS = {
+    idle: { file: 'cat-idle.webp', moves: false },
+    walk: { file: 'cat-walk.webp', moves: true }
+    // doze: { file: 'cat-doze.webp', moves: false }
+  };
+
+  /* 动作轮换顺序：自动切换与「点击换动作」都按这个顺序循环。
+     想让某个动作多出现几次，就把它在数组里多写几遍；想停用某个动作，
+     从数组里去掉即可（不影响素材本身）。 */
+  var ROTATION = ['idle', 'walk'];
+
+  /* 行为模式：roam = 漫步（按 ROTATION 轮换动作）。
+     单次动作（睡觉等）用别的值表示，届时主循环不再轮换。 */
+  var mode = 'roam';
+
+  /* ---------------- 运行状态 ---------------- */
+  var layer, el, flEl, imgEl;
+  var size    = { w: cfg.w, h: Math.round(cfg.w * ratio) };   // 显示尺寸，随配置变化
+  var pos     = { x: 0, y: 0 };                     // 猫脚所在点（视口坐标）：x 为左右中点，y 为脚底
+  var facing  = 1;                                  // 1 朝右，-1 朝左
+  var geo     = {};                                 // 界面几何缓存
+  var leg     = null;                               // 当前行走段 { from, to, start, dur }
+  var nextSwitchAt = 0;                             // 下一次动作自动切换的时间戳
+  var dragging = false;
+  var dragOff = { x: 0, y: 0 };
+  var downAt  = null;                               // 指针按下时的位置/时间/动作，用来区分「点击」与「拖拽」
+  var dragMoved = false;                            // 本次按下是否已构成拖拽（超过 4px）
+  var clickTimer = 0;                               // 单击延时器：等一小会儿看是不是双击
+  var actionKey = null;
+  var settleUntil = 0;      // 出生点"稳定期"截止时间：等版面排定后再落位
+  var settleNextAt = 0;
+  var paused = false;       // 通过控制台 cat.pause() 暂停漫步
+  var nextTeleportAllowedAt = 0;    // 允许下次瞬移的最早时间，防止连续跳
+  var ghostTimer = 0;               // 瞬移淡出的定时器；拖拽时必须能取消，否则会在手里跳走
+  var ghosting = false;             // 正在淡出换位中：此期间冻结一切轮换
+
+  /* ---------------- 几何测量 ----------------
+     每次决策前重新测量：窗口缩放、任务池收起/展开都会改变日历面板宽度 */
+  function measure() {
+    function rect(sel) {
+      var n = document.querySelector(sel);
+      return n ? n.getBoundingClientRect() : null;
+    }
+    var cal    = rect('#boardView section.panel:not(#poolPanel)');
+    var brand  = rect('.topbar .brand');
+    var topbar = rect('.topbar');
+    var acts   = rect('.topbar .actions');
+    geo = {
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      topbarBottom: topbar ? topbar.bottom : 0,
+      brandRight:   brand ? brand.right : 0,
+      actionsLeft:  acts ? acts.left : 0,
+      calTop:       cal ? cal.top : 64
+    };
+  }
+
+  /** 默认出生点：日历上沿、LOGO/标题 的右侧
+   *  这里先按"脚踩边框"给出理想值，随后由 clampPos() 统一做范围校正
+   *  （纵向会被抬到完全可见的高度） */
+  function homePoint() {
+    var b = laneBounds(geo.calTop);
+    var x = Math.max(b.minX, Math.min(b.maxX, geo.brandRight + 12 + size.w / 2));
+    return { x: x, y: geo.calTop };
+  }
+
+  /** 竖直方向的活动范围下限（猫脚最高能到哪）
+   *  72px 的猫高约 69px，而日历上边框到窗口顶部只有 62px：
+   *  若硬把脚踩在边框线上，头顶会被窗口上沿切掉约 7px（像渲染坏了）。
+   *  这里保证猫在竖直方向完全可见，代价是脚落在边框下方约 9px，
+   *  视觉上仍是"贴着日历上沿站着"。想恢复"脚踩边框、切掉耳朵"的效果，
+   *  把下面的 Math.max 换成 Math.min 即可。 */
+  function laneTopY() {
+    var ideal = Math.max(geo.calTop, size.h + 2);   // 完全可见，且尽量贴着日历上沿
+    var limit = Math.max(0, geo.vh - EDGE - size.h); // 窗口极矮时兜底，保证仍有活动空间
+    return Math.min(ideal, limit > ideal ? ideal : limit);
+  }
+
+  /** 高度 y 处的可行走横向范围（返回猫脚中点的左右极限）
+   *  若 y 处猫身会盖到顶栏，则把范围收进 LOGO/标题 与 右侧按钮区 之间的空档 */
+  function laneBounds(y) {
+    var half = size.w / 2;
+    var coversTopbar = (y - size.h) < (geo.topbarBottom - 1);
+    var minX, maxX;
+    if (coversTopbar) {
+      minX = geo.brandRight + 12;
+      maxX = (geo.actionsLeft > 0 ? geo.actionsLeft - 12 : geo.vw - EDGE);
+    } else {
+      minX = EDGE;
+      maxX = geo.vw - EDGE;
+    }
+    minX += half; maxX -= half;
+    if (maxX - minX < 8) {                 // 窗口极窄时退化为一个点，避免抖动
+      var mid = geo.vw / 2;
+      minX = maxX = mid;
+    }
+    return { minX: minX, maxX: maxX };
+  }
+
+  /** 把当前位置夹回合法范围（拖拽结束、窗口缩放后调用） */
+  function clampPos() {
+    pos.y = Math.max(laneTopY(), Math.min(geo.vh - EDGE, pos.y));
+    var b = laneBounds(pos.y);
+    pos.x = Math.max(b.minX, Math.min(b.maxX, pos.x));
+  }
+
+  /* ---------------- 渲染 ---------------- */
+  function render() {
+    if (!el) return;
+    // 元素以左上角为锚点，用 transform 移动（比 left/top 更省重排）
+    el.style.transform = 'translate(' + (pos.x - size.w / 2) + 'px,' + (pos.y - size.h) + 'px)';
+  }
+
+  function applyFacing() {
+    if (flEl) flEl.style.transform = facing < 0 ? 'scaleX(-1)' : 'scaleX(1)';
+  }
+
+  function setGhost(on) {
+    if (el) el.classList.toggle('ghost', !!on);
+  }
+
+  /* ---------------- 动作切换（为后续「睡觉」等状态预留） ---------------- */
+  /** 切换猫当前播放的动作；同一个动作重复调用不会重设 src，避免动画被重置 */
+  function setAction(key) {
+    var a = CAT_ACTIONS[key];
+    if (!a || actionKey === key || broken[a.file]) return;
+    actionKey = key;
+    imgEl.src = ASSET_DIR + a.file;
+  }
+
+  /* ---------------- 动作轮换（自动切换 + 点击切换） ----------------
+     节奏由 cfg.switchSec 统一控制，不再随机抖动：
+       · 每到切换时间 → 按 ROTATION 顺序切到下一个动作
+       · 用户单击猫猫 → 立刻切到下一个动作（并重新计时，不会紧接着又被自动切走）
+     会位移的动作（walk）切到后会真的走一段，走完由主循环收回待机。 */
+  /** 切到 ROTATION 里的下一个动作。
+   *  fromKey：以哪个动作为"当前"往后切（默认取实际动作）。
+   *          单击时传入按下瞬间的动作，避免中途动作变化导致结果不可预期。 */
+  function advanceAction(now, byUser, fromKey) {
+    measure();                // 取最新布局：窗口缩放、任务池收起都会改变可走范围
+    var base = fromKey || actionKey;
+    var i = ROTATION.indexOf(base);
+    var key = ROTATION[(i + 1) % ROTATION.length];
+    applyAction(key, now, byUser);
+    if (byUser) flash();      // 用户手动切换给个轻微反馈，不然看不出"点生效了"
+  }
+
+  /** 应用一个动作：播它的动画，并驱动相应的行为 */
+  function applyAction(key, now, byUser) {
+    var a = CAT_ACTIONS[key];
+    if (!a) return;
+    if (a.moves) {
+      // 走不动（可走范围过窄）就退化成待机，避免原地迈步
+      if (walkLeg(now)) {
+        setAction(key);
+      } else {
+        leg = null;
+        setAction('idle');
+      }
+    } else {
+      leg = null;                                   // 原地动作：先停掉正在进行的行走
+      render();
+      setAction(key);
+      // 站着的时候偶尔「悄悄换个地方」，免得整天待在同一个角落。
+      // 但用户刚点过就千万别挪走 —— 点了换动作、结果猫消失，很莫名。
+      if (!byUser && now >= nextTeleportAllowedAt && Math.random() < TELEPORT_P) teleport();
+    }
+    nextSwitchAt = now + cfg.switchSec * 1000;      // 重新计时
+  }
+
+  /* ---------------- 行走 ---------------- */
+  /** 走一段；成功起步返回 true，走不动返回 false。
+   *  走的距离按「切换间隔 × 速度」换算 —— 让"走一段"和"站一段"的时长相当，
+   *  用户设的间隔就真的等于换动作的节奏（间隔短就走小步，间隔长就走远些）。 */
+  function walkLeg(now) {
+    var b = laneBounds(pos.y);
+    var want = Math.max(STEP_MIN, Math.min(STEP_MAX, SPEED * Math.max(1, cfg.switchSec)));
+    var dir = Math.random() < 0.5 ? -1 : 1;
+    var tx = pos.x + dir * want;
+    if (tx < b.minX || tx > b.maxX) tx = pos.x - dir * want;   // 撞到边界就折返
+    tx = Math.max(b.minX, Math.min(b.maxX, tx));
+    var dist = Math.abs(tx - pos.x);
+    // 可走范围过窄时（窗口极小 / 猫被夹在 LOGO 空档里）就不走了，
+    // 否则会出现"没走两步就停下"的突兀动作
+    if (dist < 12) return false;
+
+    leg = { from: pos.x, to: tx, start: now, dur: Math.max(500, dist / SPEED * 1000) };
+    facing = tx >= pos.x ? 1 : -1;
+    applyFacing();
+    return true;
+  }
+
+  /** 取消进行中的瞬移（拖拽开始时调用），避免猫在用户手里跳走 */
+  function cancelTeleport() {
+    if (ghostTimer) { window.clearTimeout(ghostTimer); ghostTimer = 0; }
+    ghosting = false;
+    setGhost(false);
+  }
+
+  /** 换个地方：淡出 → 随机选新位置 → 淡入，看起来像悄悄挪窝 */
+  function teleport() {
+    var y = pickLaneY();
+    cancelTeleport();
+    setGhost(true);
+    leg = null;                        // 淡出期间冻结移动，避免"边淡边滑"
+    ghosting = true;                   // 换位过程中不接受任何轮换，杜绝"连跳"
+    ghostTimer = window.setTimeout(function () {
+      ghostTimer = 0;
+      ghosting = false;
+      pos.y = y;
+      var b = laneBounds(pos.y);
+      pos.x = b.minX + Math.random() * (b.maxX - b.minX);
+      clampPos();
+      render();
+      setGhost(false);
+      if (!leg) setAction('idle');     // 换好地方先站住（若已在迈步则不要覆盖走路动画）
+      nextTeleportAllowedAt = performance.now() + TELEPORT_MIN_GAP;
+      nextSwitchAt = performance.now() + cfg.switchSec * 1000;
+    }, 170);
+  }
+
+  /** 随机挑一条高度线，尽量和当前高度拉开距离，感观上才是"换了地方" */
+  function pickLaneY() {
+    var top = laneTopY();
+    var bottom = geo.vh - EDGE;
+    for (var i = 0; i < 6; i++) {
+      var y = top + Math.random() * Math.max(1, bottom - top);
+      if (Math.abs(y - pos.y) > size.h) return y;
+    }
+    return top + Math.random() * Math.max(1, bottom - top);
+  }
+
+  /* ---------------- 主循环 ---------------- */
+  function tick(now) {
+    window.requestAnimationFrame(tick);
+    if (paused || dragging || !el) return;
+    if (!cfg.on) return;    // 用户关掉了猫猫：不决策、不移动
+    if (ghosting) return;   // 正在淡出换位：冻结决策（否则 rAF 可能抢在定时器前多做一次决策）
+
+    // 出生点稳定期：字体/布局在首帧之后才排定，这期间反复重算，确保脚正好踩在日历上边框
+    if (settleUntil && now < settleUntil) {
+      if (now >= settleNextAt) {
+        settleNextAt = now + 120;
+        measure();
+        pos = homePoint();
+        clampPos();
+        render();
+      }
+      return;
+    }
+    settleUntil = 0;
+
+    // 仅「漫步」模式参与动作轮换；单次动作（睡觉等）靠切换 mode 来接管
+    if (mode !== 'roam') return;
+
+    // 到点自动切下一个动作。正在迈步时先让它走完，不打断步伐
+    if (!leg && cfg.switchSec > 0 && now >= nextSwitchAt) advanceAction(now);
+
+    if (!leg) return;
+    var t = (now - leg.start) / leg.dur;
+    if (t >= 1) {
+      pos.x = leg.to;
+      leg = null;
+      render();
+      setAction('idle');          // 走完这段就站住
+      // 关键：走完一段后重新起算，让它踏踏实实"待机"满一个间隔。
+      // 否则若这一走比切换间隔还长，切换时间早已过期，
+      // 下一帧会立刻又切去走路 —— 看起来就是"走完马上又走"，没有停顿。
+      nextSwitchAt = now + cfg.switchSec * 1000;
+      return;
+    }
+    pos.x = leg.from + (leg.to - leg.from) * t;
+    render();
+  }
+
+  /* ---------------- 拖拽 / 点击 ---------------- */
+  function onDown(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    dragging = true;
+    dragMoved = false;
+    settleUntil = 0;                       // 用户开始操作，停止出生点校正
+    cancelTeleport();                      // 关键：若此刻正赶上它"淡出换位"，取消掉，别在用户手里跳走
+    // 关键：这里先不要动动作、也不要清掉 leg。
+    // 单击只是想换个动作，若在"按下"时就切成待机，会把轮换的当前动作记错 ——
+    // 不管点什么，最后都会从待机往后切到"走路"。真拖动起来时（onMove）再切成站姿。
+    // 同时记下按下瞬间的动作：单击时以它为准往后切，结果才可预期。
+    downAt = { x: e.clientX, y: e.clientY, t: performance.now(), action: actionKey };
+    el.classList.add('dragging');
+    var r = el.getBoundingClientRect();
+    dragOff.x = e.clientX - (r.left + r.width / 2);   // 抓取点相对「脚底中点」的偏移
+    dragOff.y = e.clientY - (r.top + r.height);
+    try { el.setPointerCapture(e.pointerId); } catch (err) { /* 忽略 */ }
+    e.preventDefault();
+  }
+
+  function onMove(e) {
+    if (!dragging) return;
+    // 超过 4px 才算「拖拽」（触屏点按常有细微抖动，不能一抖就当拖拽）
+    if (!dragMoved && downAt &&
+        (Math.abs(e.clientX - downAt.x) > 4 || Math.abs(e.clientY - downAt.y) > 4)) {
+      dragMoved = true;
+      leg = null;                  // 拖拽时冻结移动，避免"边拖边滑"
+      setAction('idle');           // 被拎起来时是站着的，不该继续迈步
+    }
+    pos.x = e.clientX - dragOff.x;
+    pos.y = e.clientY - dragOff.y;
+    pos.y = Math.max(laneTopY(), Math.min(geo.vh - EDGE, pos.y));   // 拖拽时只约束纵向，横向随便放
+    render();
+  }
+
+  function onUp(e) {
+    if (!dragging) return;
+    dragging = false;
+    el.classList.remove('dragging');
+    try { el.releasePointerCapture(e.pointerId); } catch (err) { /* 忽略 */ }
+    var d = downAt; downAt = null;
+
+    // 没拖动过 = 单击（拖拽则按新位置安顿）。pointercancel 不算点击
+    if (e.type === 'pointerup' && !dragMoved && d && performance.now() - d.t < 600) {
+      onCatClick(d.action);
+      return;
+    }
+
+    clampPos();                 // 松手后夹回合法范围（例如被拖到 LOGO 上方会被让开）
+    render();
+    save();
+    setAction('idle');          // 放下之后先站住
+    // 用户把它放到这儿，就是想让它在"这儿"活动：压住瞬移冷却，
+    // 免得刚放好就又"悄悄挪窝"
+    nextTeleportAllowedAt = performance.now() + TELEPORT_MIN_GAP;
+    nextSwitchAt = performance.now() + DRAG_SETTLE_MS;
+  }
+
+  /** 单击猫猫 = 换下一个动作；连点两下 = 召回出生点。
+   *  用一小段延时区分两者，否则双击会被拆成两次「换动作」再回位，很乱。
+   *  baseKey 是按下瞬间的动作，保证"切下一个"的结果可预期。 */
+  function onCatClick(baseKey) {
+    if (clickTimer) {
+      window.clearTimeout(clickTimer);
+      clickTimer = 0;
+      goHome();
+      return;
+    }
+    clickTimer = window.setTimeout(function () {
+      clickTimer = 0;
+      advanceAction(performance.now(), true, baseKey);
+    }, 230);
+  }
+
+  /** 手动换动作时的轻微反馈：猫身闪亮一下，让人知道"点生效了" */
+  function flash() {
+    if (!el) return;
+    el.classList.remove('flash');
+    void el.offsetWidth;        // 强制重排，保证连点也能重新触发动画
+    el.classList.add('flash');
+    window.setTimeout(function () { if (el) el.classList.remove('flash'); }, 320);
+  }
+
+  /* ---------------- 偏好持久化（开关 / 大小 / 速度 / 动作切换间隔） ---------------- */
+  function loadCfg() {
+    try {
+      var o = JSON.parse(localStorage.getItem(LS_CFG) || 'null');
+      if (!o) return;
+      if (typeof o.on === 'boolean') cfg.on = o.on;
+      if (isFinite(o.w)) cfg.w = Math.min(W_MAX, Math.max(W_MIN, +o.w));
+      if (isFinite(o.tripSec)) cfg.tripSec = Math.min(T_MAX, Math.max(T_MIN, +o.tripSec));
+      // 老配置里的间隔值可能不是合法档位（比如 45 秒），这里一并吸附过来
+      if (isFinite(o.switchSec)) cfg.switchSec = snapSwitchSec(+o.switchSec);
+      // 一次性迁移：老配置没有 v 字段。若 switchSec 恰好还是当年那个默认值（30 秒），
+      // 说明用户从没手动调过它（应用每次加载都会把默认值写进去），
+      // 这时直接升到新默认值（5 分钟）—— 否则改了默认值，老用户永远看不到效果。
+      if (!(o.v >= CFG_VER) && o.switchSec === SWITCH_SEC_LEGACY) cfg.switchSec = SWITCH_SEC_DEF;
+    } catch (e) { /* 忽略 */ }
+  }
+  function saveCfg() {
+    try {
+      localStorage.setItem(LS_CFG, JSON.stringify({
+        on: cfg.on, w: cfg.w, tripSec: cfg.tripSec, switchSec: cfg.switchSec, v: CFG_VER
+      }));
+    } catch (e) { /* 忽略 */ }
+  }
+
+  /** 把配置落到运行状态：速度、尺寸、显隐；并做一次范围校正
+   *  改大小或改开关后都走这里，保证位置不会跑到可视范围外 */
+  function applyCfg() {
+    SPEED = REF_DIST / cfg.tripSec;
+    size.w = cfg.w;
+    size.h = Math.round(cfg.w * ratio);
+    if (el) el.style.width = cfg.w + 'px';
+    if (layer) layer.style.display = (cfg.on && assetOk) ? '' : 'none';
+    measure();
+    clampPos();
+    render();
+    saveCfg();
+  }
+
+  /* ---------------- 位置持久化 ---------------- */
+  function save() {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({ x: Math.round(pos.x), y: Math.round(pos.y) }));
+    } catch (e) { /* 隐私模式等场景忽略 */ }
+  }
+
+  function load() {
+    try {
+      var o = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+      if (o && isFinite(o.x) && isFinite(o.y)) return { x: +o.x, y: +o.y };
+    } catch (e) { /* 忽略 */ }
+    return null;
+  }
+
+  /* ---------------- 召回出生点 ---------------- */
+  function goHome() {
+    settleUntil = 0;
+    leg = null;                    // 必须清掉当前行走段，否则下一帧会把猫拽回原轨迹
+    cancelTeleport();
+    measure();
+    pos = homePoint();
+    clampPos();
+    render();
+    save();
+    setAction('idle');             // 回到出生点先站住
+    nextTeleportAllowedAt = performance.now() + TELEPORT_MIN_GAP;
+    nextSwitchAt = performance.now() + DRAG_SETTLE_MS;
+  }
+
+  /* ---------------- 初始化 ---------------- */
+  function init() {
+    layer = document.getElementById('catLayer');
+    if (!layer) return;
+
+    loadCfg();          // 先读取用户偏好（开关 / 大小 / 速度）
+    measure();
+
+    // 结构：容器 → 翻面层（scaleX）→ 图片
+    el = document.createElement('div');
+    el.className = 'cat';
+    el.title = '单击换动作 · 双击回家 · 按住可拖走';
+    flEl = document.createElement('div');
+    flEl.className = 'fl';
+    imgEl = document.createElement('img');
+    imgEl.alt = '';
+    imgEl.draggable = false;
+    flEl.appendChild(imgEl);
+    el.appendChild(flEl);
+    layer.appendChild(el);
+
+    // 素材缺失时不要整只猫消失：先退回 walk；连 walk 都加载不出来才撤掉挂件
+    imgEl.addEventListener('error', function () {
+      var failed = CAT_ACTIONS[actionKey] && CAT_ACTIONS[actionKey].file;
+      if (failed) broken[failed] = true;
+      if (actionKey !== 'walk' && !broken[CAT_ACTIONS.walk.file]) {
+        actionKey = null;                   // 清掉，让 setAction 真的去换图
+        setAction('walk');
+        return;
+      }
+      assetOk = false;
+      layer.style.display = 'none';
+    });
+    imgEl.addEventListener('load', function () {
+      // 按素材真实比例校正（理论上就是 100:96，以防素材被替换）
+      if (imgEl.naturalWidth) ratio = imgEl.naturalHeight / imgEl.naturalWidth;
+      applyCfg();
+      clampPos(); render();
+    });
+
+    setAction('idle');          // 出生时是站着的，先播待机
+
+    var saved = load();
+    if (saved) {
+      pos = saved;
+    } else {
+      pos = homePoint();
+      // 版面尚未排定，先开一段稳定期让出生点落到准确位置
+      settleUntil = performance.now() + 1600;
+      settleNextAt = 0;
+    }
+    clampPos();
+    render();
+    applyFacing();
+    applyCfg();         // 应用偏好：尺寸、速度、是否显示（内含一次 measure + 校正）
+
+    el.addEventListener('pointerdown', onDown);
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onUp);
+    // 单击换动作 / 双击回家都在 onUp → onCatClick 里统一处理（不再单独监听 dblclick，
+    // 否则双击会先被算成一次"换动作"再回位，很乱）
+    window.addEventListener('resize', function () {
+      measure(); clampPos(); render();
+    });
+
+    /* 控制台微调入口（挂件要反复调，留个手动开关很方便）：
+         cat.home()      回到出生点
+         cat.pause()     暂停漫步（猫停在原地）
+         cat.resume()    继续漫步
+         cat.next()      手动换下一个动作（等同于单击猫猫）
+         cat.where()     查看当前脚底坐标
+         cat.park(x, y)  直接摆到指定脚底坐标（会做范围校正）
+         cat.state()     查看内部状态（排查"跳来跳去"时很有用）
+       另外几个是给「看板设置 → 个性化设置」用的，会被设置面板调用。 */
+    window.cat = {
+      home:   function () { goHome(); return this.where(); },
+      pause:  function () { paused = true; },
+      resume: function () { paused = false; nextSwitchAt = performance.now() + 400; },
+      next:   function () { advanceAction(performance.now(), true); return actionKey; },
+      where:  function () { return { x: Math.round(pos.x), y: Math.round(pos.y) }; },
+      state:  function () {
+        return {
+          pos: this.where(),
+          walking: !!leg,
+          action: actionKey,          // 当前播放的动作（walk / idle）
+          mode: mode,
+          ghosting: ghosting,
+          gapLeftMs: Math.round(Math.max(0, nextTeleportAllowedAt - performance.now())),
+          nextSwitchInMs: Math.round(Math.max(0, nextSwitchAt - performance.now())),
+          dragging: dragging,
+          paused: paused,
+          cfg: this.getConfig()
+        };
+      },
+      park:   function (x, y) {
+        leg = null; cancelTeleport();
+        pos.x = +x; pos.y = +y;
+        clampPos(); render(); save();
+        nextTeleportAllowedAt = performance.now() + TELEPORT_MIN_GAP;
+        nextSwitchAt = performance.now() + DRAG_SETTLE_MS;
+        return this.where();
+      },
+
+      /* ---- 供「看板设置」读取 / 修改偏好 ---- */
+      getConfig: function () {
+        return {
+          on: cfg.on, w: cfg.w, tripSec: cfg.tripSec, switchSec: cfg.switchSec,
+          size: { w: size.w, h: size.h }
+        };
+      },
+      setEnabled: function (on) {
+        cfg.on = !!on;
+        if (!cfg.on) { leg = null; cancelTeleport(); }   // 隐藏前先停住，避免再显示时位置跳变
+        else {
+          nextTeleportAllowedAt = performance.now() + TELEPORT_MIN_GAP;
+          nextSwitchAt = performance.now() + 800;
+        }
+        applyCfg();
+      },
+      setWidth: function (px) {
+        var w = Math.round(+px);
+        if (!isFinite(w)) return;
+        cfg.w = Math.min(W_MAX, Math.max(W_MIN, w));
+        applyCfg();
+      },
+      setTripSec: function (sec) {
+        var s = Math.round(+sec);
+        if (!isFinite(s)) return;
+        cfg.tripSec = Math.min(T_MAX, Math.max(T_MIN, s));
+        applyCfg();
+      },
+      setSwitchSec: function (sec) {
+        if (!isFinite(+sec)) return;
+        cfg.switchSec = snapSwitchSec(+sec);       // 只接受档位里的值
+        // 改完从"现在"起算，避免设得比上次计时还长之后要干等很久才切
+        nextSwitchAt = performance.now() + cfg.switchSec * 1000;
+        applyCfg();
+      },
+
+      /** 动作切换的档位表（给「看板设置」画滑杆用）：[{sec, label}, ...] */
+      getSwitchOptions: function () {
+        return SWITCH_STEPS.map(function (s) { return { sec: s, label: switchLabel(s) }; });
+      }
+    };
+
+    // 首次切换稍等一会儿就让它动起来，
+    // 免得用户一打开页面就对着一只发呆半分钟的猫
+    nextSwitchAt = performance.now() + 2500;
+    window.requestAnimationFrame(tick);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();
 </script>
 </body>

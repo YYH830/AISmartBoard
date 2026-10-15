@@ -655,6 +655,8 @@ const MIME = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.gif': 'image/gif',
+  '.webp': 'image/webp',   // 猫猫挂件等动画图（含透明通道）
+  '.webm': 'video/webm',   // 猫猫挂件的视频版动图（备用）
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.md': 'text/markdown; charset=utf-8'

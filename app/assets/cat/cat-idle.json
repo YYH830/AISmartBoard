@@ -1,0 +1,23 @@
+{
+  "source": "standing.mp4",
+  "total_frames": 145,
+  "usable": [
+    60,
+    85
+  ],
+  "loop_mode": "乒乓循环（指定）",
+  "frames": 25,
+  "stride": 2,
+  "frame_size": [
+    108,
+    108
+  ],
+  "duration_ms": 83,
+  "loop_step_diff": 8.59,
+  "loop_gap_diff": 12.8,
+  "bg_color": [
+    0.0,
+    160.0,
+    60.0
+  ]
+}
