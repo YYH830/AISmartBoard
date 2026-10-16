@@ -44,7 +44,13 @@
   .btn.ghost:hover{color:var(--text)}
 
   /* Hero */
-  .hero{padding:34px 0 10px;text-align:center}
+  .hero{position:relative;padding:34px 0 96px;text-align:center}
+  /* 桌宠猫猫（落地页亮点）：沿 hero 底部走来走去 */
+  .catline{position:absolute;left:3%;right:3%;bottom:16px;height:1px;background:linear-gradient(90deg,transparent,var(--line-strong),transparent);pointer-events:none}
+  .hero-cat{position:absolute;left:0;bottom:15px;width:72px;pointer-events:none;will-change:transform}
+  .hero-cat .fl{display:block;transform-origin:50% 50%}
+  .hero-cat.flip .fl{transform:scaleX(-1)}
+  .hero-cat img{display:block;width:100%;height:auto}
   .hero h1{margin:0;font-size:60px;letter-spacing:-.5px;font-weight:800;line-height:1.15}
   .hero .gr{background:linear-gradient(120deg,var(--brand-1),var(--brand-2));-webkit-background-clip:text;background-clip:text;color:transparent}
   .hero p{margin:16px auto 0;max-width:620px;font-size:16px;color:var(--text-dim)}
@@ -116,6 +122,8 @@
       <div class="cta">
         <button class="btn primary" id="openLogin">登录看板 →</button>
       </div>
+      <div class="catline"></div>
+      <div class="hero-cat" id="heroCat"><div class="fl"><img id="catImg" alt="桌宠猫猫" src="assets/cat/cat-idle.webp"></div></div>
     </section>
 
     <section class="shots">
@@ -203,6 +211,40 @@
     } catch (e2) { fail('无法连接服务，请稍后重试'); }
     btn.textContent = '进入看板'; btn.disabled = false;
   });
+
+  /* ---------- 桌宠猫猫（落地页亮点）：沿 hero 底部走来走去 ---------- */
+  (function () {
+    var el = document.getElementById('heroCat');
+    if (!el) return;
+    var hero = el.parentElement;
+    var img = document.getElementById('catImg');
+    var DIR = 'assets/cat/';
+    var W = 72, x = 0, dir = 1, state = 'walk', t = 0;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function maxX() { return Math.max(0, hero.clientWidth - W - 8); }
+    function setFile(f) { if (img.getAttribute('src') !== DIR + f) img.setAttribute('src', DIR + f); }
+    function face(d) { el.classList.toggle('flip', d < 0); }
+    function step() {
+      var r = maxX();
+      if (state === 'walk') {
+        x += dir * 0.85;
+        if (x <= 0) { x = 0; dir = 1; face(1); }
+        else if (x >= r) { x = r; dir = -1; face(-1); }
+        if (++t > 260 + Math.random() * 220) { state = 'idle'; t = 0; setFile('cat-idle.webp'); }
+      } else {
+        if (++t > 150 + Math.random() * 200) { state = 'walk'; t = 0; setFile('cat-walk.webp'); }
+      }
+      el.style.transform = 'translateX(' + x + 'px)';
+      requestAnimationFrame(step);
+    }
+    x = Math.round(maxX() * 0.16);
+    el.style.transform = 'translateX(' + x + 'px)';
+    if (reduce) { face(1); return; }
+    setFile('cat-walk.webp');
+    face(1);
+    requestAnimationFrame(step);
+    window.addEventListener('resize', function () { if (x > maxX()) { x = maxX(); el.style.transform = 'translateX(' + x + 'px)'; } });
+  })();
 </script>
 </body>
 </html>
