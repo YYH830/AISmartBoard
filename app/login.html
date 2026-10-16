@@ -57,13 +57,17 @@
   .cta{margin-top:26px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
   .cta .btn{height:46px;padding:0 26px;font-size:15px}
 
-  /* 界面展示 */
-  .shots{margin:54px auto 8px;max-width:940px;display:flex;flex-direction:column;gap:54px}
-  .shot{text-align:center}
-  .shot .frame{border:1px solid var(--line-strong);border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 34px 64px -36px rgba(60,40,24,.55)}
-  .shot .frame img{display:block;width:100%;height:auto}
-  .shot h3{margin:20px 0 7px;font-size:17.5px;font-weight:700}
-  .shot p{margin:0 auto;max-width:600px;font-size:14px;color:var(--text-dim);line-height:1.78}
+  /* 界面展示（标签页切换） */
+  .shots{margin:52px auto 8px;max-width:940px}
+  .shot-tabs{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:22px}
+  .shot-tabs button{border:1px solid var(--line-strong);background:rgba(255,255,255,.72);color:var(--text-dim);border-radius:999px;height:38px;padding:0 18px;font:600 13.5px/1 inherit;cursor:pointer;transition:.18s}
+  .shot-tabs button:hover{color:var(--text);transform:translateY(-1px)}
+  .shot-tabs button.on{color:#fff;background:linear-gradient(140deg,var(--brand-1),var(--brand-2));border-color:transparent;box-shadow:0 12px 22px -14px var(--brand-1)}
+  .shot-panel{text-align:center}
+  .shot-panel .frame{border:1px solid var(--line-strong);border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 34px 64px -36px rgba(60,40,24,.55)}
+  .shot-panel .frame img{display:block;width:100%;height:auto}
+  .shot-panel h3{margin:20px 0 7px;font-size:17.5px;font-weight:700}
+  .shot-panel p{margin:0 auto;max-width:620px;font-size:14px;color:var(--text-dim);line-height:1.78}
 
   /* 登录弹窗 */
   .backdrop{position:fixed;inset:0;z-index:50;display:none;place-items:center;padding:20px;background:rgba(40,28,18,.34);backdrop-filter:blur(7px);animation:fade .18s both}
@@ -123,29 +127,20 @@
         <button class="btn primary" id="openLogin">登录看板 →</button>
       </div>
       <div class="catline"></div>
-      <div class="hero-cat" id="heroCat"><div class="fl"><img id="catImg" alt="桌宠猫猫" src="assets/cat/cat-idle.webp"></div></div>
+      <div class="hero-cat" id="heroCat"><div class="fl"><img id="catImg" alt="桌宠猫猫" src="assets/cat/cat-walk.webp"></div></div>
     </section>
 
     <section class="shots">
-      <div class="shot">
-        <div class="frame"><img src="assets/shots/board-main.jpg" alt="任务池与日历排期"></div>
-        <h3>任务池 + 日历排期</h3>
-        <p>左边月历、右边任务池。把任务拖到日历上，按「预估人天」自动占天数；法定节假日、周末自动标注，还能按工作日排期。</p>
+      <div class="shot-tabs" id="shotTabs">
+        <button type="button" data-shot="0" class="on">任务池 + 日历</button>
+        <button type="button" data-shot="1">AI 助手</button>
+        <button type="button" data-shot="2">任务详情</button>
+        <button type="button" data-shot="3">看板设置 &amp; 猫猫</button>
       </div>
-      <div class="shot">
-        <div class="frame"><img src="assets/shots/ai-assistant.jpg" alt="AI 助手" loading="lazy"></div>
-        <h3>AI 助手，能读也能改</h3>
-        <p>基于你的台账总结、分析；也能直接帮你建、改、删任务——每一步都会先弹确认卡片，改前改后一目了然。</p>
-      </div>
-      <div class="shot">
-        <div class="frame"><img src="assets/shots/task-modal.jpg" alt="任务详情" loading="lazy"></div>
-        <h3>任务详情</h3>
-        <p>状态、优先级、标签、预估人天、多段排期一次搞定；团队看板还带「负责人」与操作历史。</p>
-      </div>
-      <div class="shot">
-        <div class="frame"><img src="assets/shots/settings.jpg" alt="看板设置与桌宠猫猫" loading="lazy"></div>
-        <h3>看板设置 &amp; 桌宠猫猫</h3>
-        <p>深/浅皮肤、日历设置、AI 设置集中在一处；日历上还有一只会溜达的桌宠猫猫。</p>
+      <div class="shot-panel">
+        <div class="frame"><img id="shotImg" src="assets/shots/board-main.jpg" alt=""></div>
+        <h3 id="shotTitle"></h3>
+        <p id="shotDesc"></p>
       </div>
     </section>
 
@@ -212,38 +207,52 @@
     btn.textContent = '进入看板'; btn.disabled = false;
   });
 
-  /* ---------- 桌宠猫猫（落地页亮点）：沿 hero 底部走来走去 ---------- */
+  /* ---------- 桌宠猫猫（落地页亮点）：只在 hero 底部走来走去 ---------- */
   (function () {
     var el = document.getElementById('heroCat');
     if (!el) return;
     var hero = el.parentElement;
-    var img = document.getElementById('catImg');
-    var DIR = 'assets/cat/';
-    var W = 72, x = 0, dir = 1, state = 'walk', t = 0;
+    var W = 72, x = 0, dir = 1;
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     function maxX() { return Math.max(0, hero.clientWidth - W - 8); }
-    function setFile(f) { if (img.getAttribute('src') !== DIR + f) img.setAttribute('src', DIR + f); }
     function face(d) { el.classList.toggle('flip', d < 0); }
     function step() {
       var r = maxX();
-      if (state === 'walk') {
-        x += dir * 0.85;
-        if (x <= 0) { x = 0; dir = 1; face(1); }
-        else if (x >= r) { x = r; dir = -1; face(-1); }
-        if (++t > 260 + Math.random() * 220) { state = 'idle'; t = 0; setFile('cat-idle.webp'); }
-      } else {
-        if (++t > 150 + Math.random() * 200) { state = 'walk'; t = 0; setFile('cat-walk.webp'); }
-      }
+      x += dir * 0.85;
+      if (x <= 0) { x = 0; dir = 1; face(1); }
+      else if (x >= r) { x = r; dir = -1; face(-1); }
       el.style.transform = 'translateX(' + x + 'px)';
       requestAnimationFrame(step);
     }
     x = Math.round(maxX() * 0.16);
     el.style.transform = 'translateX(' + x + 'px)';
-    if (reduce) { face(1); return; }
-    setFile('cat-walk.webp');
     face(1);
+    if (reduce) return;
     requestAnimationFrame(step);
     window.addEventListener('resize', function () { if (x > maxX()) { x = maxX(); el.style.transform = 'translateX(' + x + 'px)'; } });
+  })();
+
+  /* ---------- 界面展示：标签页切换 ---------- */
+  (function () {
+    var DATA = [
+      { img: 'assets/shots/board-main.jpg', t: '任务池 + 日历排期', d: '左边月历、右边任务池。把任务拖到日历上，按「预估人天」自动占天数；法定节假日、周末自动标注，还能按工作日排期。' },
+      { img: 'assets/shots/ai-assistant.jpg', t: 'AI 助手，能读也能改', d: '基于你的台账总结、分析；也能直接帮你建、改、删任务——每一步都会先弹确认卡片，改前改后一目了然。' },
+      { img: 'assets/shots/task-modal.jpg', t: '任务详情', d: '状态、优先级、标签、预估人天、多段排期一次搞定；团队看板还带「负责人」与操作历史。' },
+      { img: 'assets/shots/settings.jpg', t: '看板设置 & 桌宠猫猫', d: '深 / 浅皮肤、日历设置、AI 设置集中在一处；日历上还有一只会溜达的桌宠猫猫。' }
+    ];
+    var tabs = document.getElementById('shotTabs');
+    if (!tabs) return;
+    var img = document.getElementById('shotImg'), h = document.getElementById('shotTitle'), p = document.getElementById('shotDesc');
+    function show(i) {
+      var o = DATA[i]; if (!o) return;
+      img.src = o.img; h.textContent = o.t; p.textContent = o.d;
+      Array.prototype.forEach.call(tabs.querySelectorAll('button'), function (b, k) { b.classList.toggle('on', k === i); });
+    }
+    tabs.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button[data-shot]') : null;
+      if (b) show(+b.getAttribute('data-shot'));
+    });
+    show(0);
   })();
 </script>
 </body>
