@@ -864,24 +864,24 @@ main{
 @media (max-width:900px){ #boardView.pool-collapsed{grid-template-rows:minmax(320px,1fr)} }
 
 /* ============================== AI 智能分析：侧边按钮 + 右侧滑出面板 ============================== */
-/* 右侧留出一条栏给悬浮按钮，避免盖住面板内容/滚动条 */
-.app{padding-right:32px}
-/* 贴着右缘的竖条按钮，点一下把 AI 面板滑出 / 收起 */
+/* 右侧留出一条栏给悬浮按钮，两边各留一点呼吸间距 */
+.app{padding-right:46px}
+/* 贴着右缘的悬浮按钮，点一下把 AI 面板滑出 / 收起 */
 .ai-edge{
-  position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:70;
+  position:fixed;right:7px;top:50%;transform:translateY(-50%);z-index:70;
   width:32px;
   display:flex;flex-direction:column;align-items:center;gap:8px;
   padding:15px 0;border:none;cursor:pointer;
-  border-radius:14px 0 0 14px;
+  border-radius:14px;
   background:linear-gradient(150deg,var(--brand-1),var(--brand-2));color:#fff;
-  box-shadow:-12px 0 26px -14px var(--brand-1), inset 0 1px 0 rgba(255,255,255,.35);
+  box-shadow:0 12px 26px -12px var(--brand-1), inset 0 1px 0 rgba(255,255,255,.35);
   transition:filter .2s,background .2s,transform .25s,opacity .25s;
 }
 .ai-edge:hover{filter:brightness(1.06)}
 .ai-edge:active{filter:brightness(.97)}
 .ai-edge svg{width:12px;height:12px;display:inline-block;vertical-align:-1px;margin-right:1px}
 .ai-edge span{display:inline-block;font-size:12.5px;font-weight:650;letter-spacing:0;line-height:1.35;text-align:center}
-.ai-edge.active{background:var(--panel);color:var(--brand-1);border:1px solid var(--line);border-right:0;box-shadow:-12px 0 26px -16px rgba(60,40,20,.42)}
+.ai-edge.active{background:var(--panel);color:var(--brand-1);border:1px solid var(--line);box-shadow:0 12px 26px -16px rgba(60,40,20,.42)}
 
 /* AI 面板：浮在任务池上方、同宽同高；进出都从右侧滑动 */
 #aiPanel{display:none;animation:none;position:absolute;z-index:6}
