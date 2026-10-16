@@ -837,6 +837,8 @@ main{
 .bar .bar-prio{font-size:10px;flex:none;padding:1px 6px;border-radius:20px;background:rgba(255,255,255,.24);border:1px solid rgba(255,255,255,.32);font-weight:700}
 .bar .bar-tags{display:flex;gap:3px;flex:none;overflow:hidden;max-width:42%}
 .bar .bar-tag{font-size:9.5px;padding:0 5px;border-radius:8px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.24);white-space:nowrap;overflow:hidden;max-width:58px;text-overflow:ellipsis}
+.bar .bar-id{font-size:10px;flex:none;font-weight:700;padding:0 5px;border-radius:8px;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.28);letter-spacing:.2px}
+.bar.narrow .bar-id{display:none}
 
 /* 筛选按钮上的“有筛选”小圆点 */
 #btnFilter{position:relative}
@@ -1128,7 +1130,7 @@ main{
           <section class="setblock">
             <h4 class="setblock-title">任务条展示字段</h4>
             <div class="fchips" id="calFields"></div>
-            <div class="hintline">任务名称始终展示；再勾选优先级 / 标签 / 人天，日历上的任务条会一并显示。</div>
+            <div class="hintline">任务名称始终展示；再勾选任务序号 / 优先级 / 标签 / 人天（团队看板还有负责人），日历上的任务条会一并显示。</div>
           </section>
         </div>
 
@@ -1382,7 +1384,7 @@ main{
   let schedMode = 'natural';
   try { const _sm = lsGet('wtk-sched'); if (_sm === 'workday' || _sm === 'natural') schedMode = _sm; } catch (e) { /* 忽略 */ }
   // 日历任务条展示字段（任务名称始终展示）
-  let calFields = { prio: false, tags: false, days: false };
+  let calFields = { id: false, prio: false, tags: false, days: false, assignee: true };
   try { const _cf = JSON.parse(lsGet('wtk-cal-fields') || 'null'); if (_cf && typeof _cf === 'object') calFields = Object.assign(calFields, _cf); } catch (e) { /* 忽略 */ }
   const uid = (p) => p + Date.now().toString(36).slice(-4) + Math.random().toString(36).slice(2, 6);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -2191,10 +2193,11 @@ main{
         ' style="grid-column:' + (it.c1 + 1) + ' / span ' + span + '; grid-row:' + (it.lane + 1) + '"' +
         ' title="' + esc(tip) + '">' +
         '<span class="h h-l" data-h="l"></span>' +
+        (calFields.id ? '<span class="bar-id">' + esc(it.seg.taskId) + '</span>' : '') +
         '<span class="bar-title">' + esc(title) + '</span>' +
         (calFields.prio ? '<span class="bar-prio">' + (PRIORITY_CN[priority] || '') + '</span>' : '') +
         (calFields.tags && tags.length ? '<span class="bar-tags">' + tags.slice(0, 3).map((tg) => '<span class="bar-tag">' + esc(tg) + '</span>').join('') + '</span>' : '') +
-        (assignee ? '<span class="bar-who">' + esc(memberLabel(assignee)) + '</span>' : '') +
+        (calFields.assignee && assignee ? '<span class="bar-who">' + esc(memberLabel(assignee)) + '</span>' : '') +
         (calFields.days ? '<span class="bar-days">' + fmtDays(days) + '人天</span>' : '') +
         '<span class="h h-r" data-h="r"></span>' +
       '</div>'
@@ -2512,7 +2515,8 @@ main{
     if (seg) Array.prototype.forEach.call(seg.querySelectorAll('[data-mode]'), (b) => { b.classList.toggle('on', (b.dataset.mode === 'workday') === (schedMode === 'workday')); });
     const cf = $('calFields');
     if (cf) {
-      const defs = [['prio', '优先级'], ['tags', '标签'], ['days', '人天']];
+      const defs = [['id', '任务序号'], ['prio', '优先级'], ['tags', '标签'], ['days', '人天']];
+      if (Store.team) defs.push(['assignee', '负责人']);
       cf.innerHTML = defs.map(([k, label]) => '<span class="fchip' + (calFields[k] ? ' on' : '') + '" data-field="' + k + '">' + label + '</span>').join('');
     }
   }
