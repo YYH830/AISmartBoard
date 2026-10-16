@@ -863,38 +863,43 @@ main{
 #boardView.pool-collapsed #poolPanel{display:none}
 @media (max-width:900px){ #boardView.pool-collapsed{grid-template-rows:minmax(320px,1fr)} }
 
-/* ============================== AI 悬浮按钮 + 对话框 ============================== */
-.ai-fab{
-  position:fixed;right:22px;bottom:22px;z-index:80;
-  width:54px;height:54px;border-radius:50%;border:none;cursor:pointer;
-  background:linear-gradient(140deg,var(--brand-1),var(--brand-2));color:#fff;
-  display:grid;place-items:center;transition:.2s;
-  box-shadow:0 14px 28px -10px var(--brand-1), inset 0 1px 0 rgba(255,255,255,.45);
+/* ============================== AI 智能分析：侧边按钮 + 右侧滑出面板 ============================== */
+/* 右侧留出一条栏给悬浮按钮，避免盖住面板内容/滚动条 */
+.app{padding-right:28px}
+/* 贴着右缘的竖条按钮，点一下把 AI 面板滑出 / 收起 */
+.ai-edge{
+  position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:70;
+  width:28px;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  padding:15px 0;border:none;cursor:pointer;
+  border-radius:14px 0 0 14px;
+  background:linear-gradient(150deg,var(--brand-1),var(--brand-2));color:#fff;
+  box-shadow:-12px 0 26px -14px var(--brand-1), inset 0 1px 0 rgba(255,255,255,.35);
+  transition:filter .2s,background .2s,transform .25s,opacity .25s;
 }
-.ai-fab:hover{transform:translateY(-2px);filter:brightness(1.05)}
-.ai-fab:active{transform:translateY(0) scale(.97)}
-.ai-fab svg{width:25px;height:25px}
-.ai-dock{
-  position:fixed;right:22px;bottom:88px;z-index:81;
-  width:min(400px, calc(100vw - 28px));
-  height:min(600px, calc(100vh - 128px));
-  background:var(--panel);border:1px solid var(--line);border-radius:18px;
-  box-shadow:0 30px 70px -28px rgba(60,40,20,.55);
-  display:flex;flex-direction:column;overflow:hidden;
-  backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);
-  transform-origin:bottom right;animation:aiDockIn .22s cubic-bezier(.2,.8,.25,1);
-}
-.ai-dock[hidden]{display:none}
-@keyframes aiDockIn{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
-.ai-dock-head{display:flex;align-items:center;gap:6px;padding:11px 12px 11px 15px;border-bottom:1px solid var(--line);flex:none}
-.ai-dock-title{font-size:14px;font-weight:680;color:var(--text);display:flex;align-items:center;gap:7px}
-.ai-dock-title svg{width:16px;height:16px;color:var(--brand-1)}
-.ai-dock .ai-chat{padding:16px 16px 6px}
-.ai-dock .ai-input{padding:10px 14px 14px}
-.ai-dock .ai-input textarea{min-height:74px}
+.ai-edge:hover{filter:brightness(1.06)}
+.ai-edge:active{filter:brightness(.97)}
+.ai-edge svg{width:17px;height:17px;flex:none}
+.ai-edge span{writing-mode:vertical-rl;text-orientation:upright;font-size:11.5px;font-weight:650;letter-spacing:2px}
+.ai-edge.active{background:var(--panel);color:var(--brand-1);border:1px solid var(--line);border-right:0;box-shadow:-12px 0 26px -16px rgba(60,40,20,.42)}
+
+/* AI 面板：与任务池同一栏、同尺寸；默认隐藏，ai-open 时从右侧滑入 */
+#aiPanel{display:none;animation:none}
+#boardView.ai-open{overflow:hidden}
+#boardView.ai-open #poolPanel{display:none}
+#boardView.ai-open #aiPanel{display:flex}
+#aiPanel.sliding{animation:aiSlideIn .3s cubic-bezier(.22,.8,.25,1) both}
+@keyframes aiSlideIn{from{opacity:.4;transform:translateX(100%)}to{opacity:1;transform:none}}
+.ai-head{padding-top:8px;padding-bottom:8px}
+.ai-head .ai-title{font-size:14px;font-weight:680;color:var(--text);display:flex;align-items:center;gap:8px}
+.ai-head .ai-title svg{width:16px;height:16px;color:var(--brand-1)}
+#aiPanel .ai-chat{padding:18px 18px 6px}
+#aiPanel .ai-input{padding:12px 18px 16px}
+#aiPanel .ai-input textarea{min-height:88px}
 @media (max-width:900px){
-  .ai-dock{right:12px;left:12px;width:auto;bottom:84px;height:min(72vh,560px)}
-  .ai-fab{right:15px;bottom:15px}
+  .ai-edge{top:auto;bottom:16px;transform:none}
+  /* 窄屏时按钮在右下角，展开后滑走以免挡住发送框 */
+  .ai-edge.active{transform:translateX(150%);opacity:0;pointer-events:none}
 }
 
 /* ============================== 桌宠：猫猫挂件 ==============================
@@ -1050,43 +1055,45 @@ main{
       </div>
 
     </section>
-  </main>
 
-  <!-- ================= AI 悬浮按钮 + 对话框 ================= -->
-  <button class="ai-fab" id="aiFab" title="AI 智能分析">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.9L18.8 9.7l-4.9 1.9L12 16.5l-1.9-4.9L5.2 9.7l4.9-1.9z"/><path d="M18.6 15.6l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg>
-  </button>
-
-  <div class="ai-dock" id="aiDock" hidden>
-    <div class="ai-dock-head">
-      <span class="ai-dock-title">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.9L18.8 9.7l-4.9 1.9L12 16.5l-1.9-4.9L5.2 9.7l4.9-1.9z"/><path d="M18.6 15.6l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg>
-        AI 智能分析
-      </span>
-      <div class="spacer"></div>
-      <button class="icon-btn" id="aiHistBtn" title="历史记录">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4.5l3 1.8"/></svg>
-      </button>
-      <button class="icon-btn" id="aiDockClose" title="关闭">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-    <div class="ai-chat" id="aiChat"></div>
-    <div class="ai-quick" id="aiQuick">
-      <button data-q="帮我总结一下本周（本周一到今天）的工作任务">总结本周</button>
-      <button data-q="帮我分析一下我目前的工作量分布和整体进度">分析工作量</button>
-      <button data-q="我有哪些任务已经逾期，或者最近要到期了？">逾期 / 临期</button>
-      <button data-q="帮我建个任务：周五前整理一份招商方案，高优先级，预估 3 人天">建任务</button>
-    </div>
-    <form class="ai-input" id="aiForm">
-      <div class="ai-inputbox">
-        <textarea id="aiText" rows="1" placeholder="总结、分析，或直接让我建任务；例：「帮我建个任务：周五前出招商方案，高优先级」"></textarea>
-        <button type="submit" class="ai-sendbtn" id="aiSend" title="发送">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9 22 2z"/></svg>
+    <!-- 右：AI 智能分析（与任务池同栏同尺寸，从右侧滑出） -->
+    <section class="panel" id="aiPanel">
+      <div class="pane-head ai-head">
+        <div class="ai-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.9L18.8 9.7l-4.9 1.9L12 16.5l-1.9-4.9L5.2 9.7l4.9-1.9z"/><path d="M18.6 15.6l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg>
+          AI 智能分析
+        </div>
+        <div class="spacer"></div>
+        <button class="icon-btn" id="aiHistBtn" title="历史记录">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4.5l3 1.8"/></svg>
+        </button>
+        <button class="icon-btn" id="aiDockClose" title="收起">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 6l5.5 6L7 18"/><path d="M13.5 6L19 12l-5.5 6"/></svg>
         </button>
       </div>
-    </form>
-  </div>
+      <div class="ai-chat" id="aiChat"></div>
+      <div class="ai-quick" id="aiQuick">
+        <button data-q="帮我总结一下本周（本周一到今天）的工作任务">总结本周</button>
+        <button data-q="帮我分析一下我目前的工作量分布和整体进度">分析工作量</button>
+        <button data-q="我有哪些任务已经逾期，或者最近要到期了？">逾期 / 临期</button>
+        <button data-q="帮我建个任务：周五前整理一份招商方案，高优先级，预估 3 人天">建任务</button>
+      </div>
+      <form class="ai-input" id="aiForm">
+        <div class="ai-inputbox">
+          <textarea id="aiText" rows="1" placeholder="总结、分析，或直接让我建任务；例：「帮我建个任务：周五前出招商方案，高优先级」"></textarea>
+          <button type="submit" class="ai-sendbtn" id="aiSend" title="发送">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9 22 2z"/></svg>
+          </button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <!-- ================= AI 侧边悬浮按钮 ================= -->
+  <button class="ai-edge" id="aiEdge" title="AI 智能分析">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.9L18.8 9.7l-4.9 1.9L12 16.5l-1.9-4.9L5.2 9.7l4.9-1.9z"/><path d="M18.6 15.6l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg>
+    <span>AI 智能分析</span>
+  </button>
 
   <!-- ================= 看板设置（统一入口：个性化 / 日历 / AI） =================
        三个标签页共用这一个弹窗，后续要加设置项直接加标签页即可。
@@ -3540,6 +3547,7 @@ main{
       const t2 = $('btnPoolCollapse'); if (t2) t2.title = tip;
     };
     const togglePool = () => { const bv = $('boardView'); setPoolCollapsed(!(bv && bv.classList.contains('pool-collapsed'))); };
+    window.__wtkSetPoolCollapsed = setPoolCollapsed;   // 供 AI 面板切换时联动
     if ($('btnPoolToggle')) $('btnPoolToggle').onclick = togglePool;
     if ($('btnPoolCollapse')) $('btnPoolCollapse').onclick = togglePool;
     let poolCollapsed0 = false; try { poolCollapsed0 = localStorage.getItem('wtk-pool-collapsed') === '1'; } catch (e2) { /* 忽略 */ }
@@ -4190,23 +4198,53 @@ main{
   }
   function closeHistory() { $('aiHistBackdrop').style.display = 'none'; }
 
-  /* ---------- 悬浮 AI 对话框 ---------- */
+  /* ---------- AI 面板：从右侧滑出 / 收起 ---------- */
+  function aiRoot() { return document.getElementById('boardView'); }
+
   function openDock() {
-    var d = $('aiDock'); if (!d) return;
-    d.hidden = false;
+    var root = aiRoot(), p = $('aiPanel'), e = $('aiEdge');
+    if (!root || !p) return;
+    // 若任务池处于「收起」状态，先展开（AI 与任务池占同一栏）
+    if (root.classList.contains('pool-collapsed')) {
+      root.__aiPrevCollapsed = true;
+      if (window.__wtkSetPoolCollapsed) window.__wtkSetPoolCollapsed(false);
+      else root.classList.remove('pool-collapsed');
+    }
+    root.classList.add('ai-open');
+    if (e) { e.classList.add('active'); e.title = '收起 AI 智能分析'; }
+    p.classList.remove('sliding'); void p.offsetWidth; p.classList.add('sliding');
     loadConfig();
-    setTimeout(function () { if (textEl) textEl.focus(); }, 60);
+    setTimeout(function () { if (textEl) textEl.focus(); }, 140);
   }
-  function closeDock() { var d = $('aiDock'); if (d) d.hidden = true; }
-  function toggleDock() { var d = $('aiDock'); if (!d) return; if (d.hidden) openDock(); else closeDock(); }
+
+  function closeDock() {
+    var root = aiRoot(), p = $('aiPanel'), e = $('aiEdge');
+    if (!root || !p) return;
+    root.classList.remove('ai-open');
+    p.classList.remove('sliding');
+    if (e) { e.classList.remove('active'); e.title = 'AI 智能分析'; }
+    if (root.__aiPrevCollapsed) {
+      root.__aiPrevCollapsed = false;
+      if (window.__wtkSetPoolCollapsed) window.__wtkSetPoolCollapsed(true);
+      else root.classList.add('pool-collapsed');
+    }
+  }
+
+  function toggleDock() {
+    var root = aiRoot(); if (!root) return;
+    if (root.classList.contains('ai-open')) closeDock(); else openDock();
+  }
 
   function bind() {
     chatEl = $('aiChat'); formEl = $('aiForm'); textEl = $('aiText'); sendBtn = $('aiSend');
     if (!chatEl) return;
     showEmpty();
 
-    $('aiFab').onclick = toggleDock;
-    $('aiDockClose').onclick = closeDock;
+    var edgeBtn = $('aiEdge'); if (edgeBtn) edgeBtn.onclick = toggleDock;
+    var closeBtn = $('aiDockClose'); if (closeBtn) closeBtn.onclick = closeDock;
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { var root = aiRoot(); if (root && root.classList.contains('ai-open')) closeDock(); }
+    });
 
     formEl.addEventListener('submit', function (e) { e.preventDefault(); send(textEl.value); });
     textEl.addEventListener('input', autoGrow);
