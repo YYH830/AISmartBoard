@@ -875,6 +875,7 @@ main{
 #aiPane .ai-input textarea{min-height:88px}
 #rightTabs{flex-wrap:wrap}
 #rightTabs .tab .count:empty{display:none}
+.ai-restore-hint{align-self:center;font-size:11.5px;color:var(--text-mute);background:var(--panel-2);border:1px dashed var(--line);border-radius:20px;padding:3px 12px;margin:2px 0}
 
 /* ============================== 桌宠：猫猫挂件 ==============================
    一个覆盖全屏的透明层，猫在里面自由走动。
@@ -1006,6 +1007,9 @@ main{
           <button class="tab" type="button" data-rtab="ai">AI 智能分析</button>
         </div>
         <div class="spacer"></div>
+        <button class="icon-btn" id="aiNewBtn" title="新对话（清空当前对话，历史记录仍保留）" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
         <button class="icon-btn" id="aiHistBtn" title="历史记录" style="display:none">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4.5l3 1.8"/></svg>
         </button>
@@ -3849,6 +3853,8 @@ main{
   var chatEl, formEl, textEl, sendBtn;
   var history = [];          // 会话历史 {role, content}
   var lastActionNoteIdx = -1; // 上一条「待创建任务」assistant 消息在 history 里的下标
+  var restored = false;       // 是否已尝试从服务端载入历史对话
+  var chatBoardKey = '';      // 当前对话对应的看板标识（换看板时重置对话）
   var busy = false;
   var providers = [];
   var keyConfigured = false;
@@ -4275,6 +4281,42 @@ main{
   function closeHistory() { $('aiHistBackdrop').style.display = 'none'; }
 
   /* ---------- 右侧标签页：任务池 / AI 智能分析 ---------- */
+  function currentBoardKey() { return (aiTeam() || '') + '|' + aiCurrentFile(); }
+
+  /** 清空当前对话（仅清前端，不动服务端历史存档） */
+  function resetChat() {
+    history.length = 0;
+    lastActionNoteIdx = -1;
+    if (chatEl) { chatEl.innerHTML = ''; showEmpty(); }
+    restored = false;
+  }
+
+  /** 载入该看板最近的对话，实现「刷新后接着聊」 */
+  async function ensureConversation() {
+    var key = currentBoardKey();
+    if (chatBoardKey !== key) { resetChat(); chatBoardKey = key; }
+    if (restored) return;
+    restored = true;
+    try {
+      var r = await fetch('/api/ai/history' + aiTeamQ(), { cache: 'no-store' });
+      var j = await r.json();
+      var recs = (j && j.records) || [];      // 最新在前
+      if (!recs.length) return;
+      recs = recs.slice(0, 20).reverse();     // 取最近 20 条，按时间正序
+      var empty = chatEl.querySelector('.ai-empty'); if (empty) empty.remove();
+      var hint = document.createElement('div');
+      hint.className = 'ai-restore-hint';
+      hint.textContent = '已载入最近的对话，可直接接着聊';
+      chatEl.appendChild(hint);
+      recs.forEach(function (rec) {
+        if (rec.q) { addMsg('user', rec.q); history.push({ role: 'user', content: rec.q }); }
+        if (rec.a) { addMsg('ai', rec.a); history.push({ role: 'assistant', content: rec.a }); }
+      });
+      if (history.length > 40) history.splice(0, history.length - 40);   // 只保留最近一段
+      scrollBottom();
+    } catch (e) { /* 忽略，下次切回来再试 */ }
+  }
+
   function switchRightTab(name, persist) {
     var panel = $('poolPanel'), poolPane = $('poolPane'), aiPane = $('aiPane'), tabs = $('rightTabs');
     if (!panel || !poolPane || !aiPane || !tabs) return;
@@ -4286,8 +4328,10 @@ main{
       btns[i].classList.toggle('active', btns[i].getAttribute('data-rtab') === name);
     }
     var hb = $('aiHistBtn'); if (hb) hb.style.display = isAi ? '' : 'none';
+    var nb = $('aiNewBtn'); if (nb) nb.style.display = isAi ? '' : 'none';
     if (isAi) {
       loadConfig();
+      ensureConversation();
       setTimeout(function () { if (textEl) textEl.focus(); }, 80);
     }
     if (persist !== false) { try { LS.set('wtk-right-tab', name); } catch (e) { /* 忽略 */ } }
@@ -4303,6 +4347,16 @@ main{
       var b = e.target.closest ? e.target.closest('.tab[data-rtab]') : null;
       if (b) switchRightTab(b.getAttribute('data-rtab'));
     });
+    // 新对话：清空当前对话（历史记录仍保留在「历史记录」里）
+    var newBtn = $('aiNewBtn');
+    if (newBtn) newBtn.onclick = function () {
+      if (busy) return;
+      resetChat();
+      restored = true;                       // 手动新开对话后，不再自动载入历史
+      chatBoardKey = currentBoardKey();
+      if (window.__wtkToast) window.__wtkToast('已开启新对话（历史记录仍可在右上角查看）');
+      if (textEl) textEl.focus();
+    };
     // 恢复上次停留的标签页（默认任务池）
     var startTab = 'pool';
     try { startTab = LS.get('wtk-right-tab') || 'pool'; } catch (e2) { /* 忽略 */ }
