@@ -936,6 +936,68 @@ const AI_TOOLS = [
         required: ['tasks']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_tasks',
+      description: '修改已存在任务的字段（状态 / 标题 / 优先级 / 标签 / 预估人天 / 负责人 / 备注 / 排期）。' +
+        '只填要改的字段，没提到的字段保持不变；id 必须是台账里已存在的编号。' +
+        '当用户说「把某个任务标为完成 / 改成… / 改到某天 / 把状态改成」等时调用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          updates: {
+            type: 'array',
+            description: '要修改的任务列表',
+            items: {
+              type: 'object',
+              properties: {
+                id:       { type: 'string', description: '要修改的任务编号，如 T3（必须是台账里已存在的）' },
+                title:    { type: 'string', description: '新的任务名称（仅在要改标题时填）' },
+                status:   { type: 'string', enum: ['todo', 'done', 'paused'], description: '新状态' },
+                priority: { type: 'string', enum: ['high', 'medium', 'low'], description: '新优先级' },
+                tags:     { type: 'array', items: { type: 'string' }, description: '新标签（空数组表示清空）' },
+                days:     { type: 'number', description: '新的预估人天' },
+                assignee: { type: 'string', description: '新的负责人（仅团队看板）' },
+                note:     { type: 'string', description: '新备注（空字符串表示清空）' },
+                start:    { type: 'string', description: '排期开始日期 YYYY-MM-DD；与 end 同时给空字符串表示取消排期' },
+                end:      { type: 'string', description: '排期结束日期 YYYY-MM-DD' }
+              },
+              required: ['id']
+            }
+          },
+          note: { type: 'string', description: '给用户的一句话说明' }
+        },
+        required: ['updates']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_tasks',
+      description: '删除已存在的任务（会连同它的排期一起删掉）。当用户明确要求「删掉 / 删除某个任务」时调用，id 必须是台账里已存在的编号。',
+      parameters: {
+        type: 'object',
+        properties: {
+          tasks: {
+            type: 'array',
+            description: '要删除的任务列表',
+            items: {
+              type: 'object',
+              properties: {
+                id:    { type: 'string', description: '要删除的任务编号，如 T3' },
+                title: { type: 'string', description: '任务名称（用于给用户确认，照抄台账即可）' }
+              },
+              required: ['id']
+            }
+          },
+          note: { type: 'string', description: '给用户的一句话说明' }
+        },
+        required: ['tasks']
+      }
+    }
   }
 ];
 
@@ -976,6 +1038,162 @@ function normalizeAiTasks(raw) {
     out.push({ title: title, status: status, priority: priority, days: days, tags: tags, assignee: assignee, note: note });
   }
   return out.slice(0, 50);   // 单次最多 50 条，防止模型「手滑」一次灌几百条
+}
+
+const mdCell = (v) => String(v == null ? '' : v).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim();
+
+/** 定位台账里的某张表（任务池 / 排期）：返回表头行、分隔行、数据行区间与表头单元格 */
+function findLedgerTable(lines, nameRe) {
+  let secIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^#{1,6}\s/.test(lines[i].trim()) && nameRe.test(lines[i])) { secIdx = i; break; }
+  }
+  let headIdx = -1;
+  for (let i = (secIdx >= 0 ? secIdx + 1 : 0); i < lines.length; i++) {
+    const s = lines[i].trim();
+    if (secIdx >= 0 && i > secIdx && /^#{1,6}\s/.test(s)) break;
+    if (s.startsWith('|')) { headIdx = i; break; }
+  }
+  if (headIdx < 0) return null;
+  const isSep = (s) => /^\|?[\s:|-]+\|[\s:|-]*$/.test(s) && s.indexOf('-') >= 0;
+  let sepIdx = headIdx + 1;
+  if (!(sepIdx < lines.length && isSep(lines[sepIdx].trim()))) sepIdx = headIdx;
+  let endIdx = sepIdx;
+  for (let i = sepIdx + 1; i < lines.length; i++) { if (!lines[i].trim().startsWith('|')) break; endIdx = i; }
+  const splitRow = (line) => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+  return { headIdx: headIdx, sepIdx: sepIdx, endIdx: endIdx, header: splitRow(lines[headIdx]), splitRow: splitRow };
+}
+
+/** 规范化「修改任务」的工具参数 */
+function normalizeAiUpdates(raw) {
+  const list = (raw && Array.isArray(raw.updates)) ? raw.updates : [];
+  const out = [];
+  for (const u of list) {
+    if (!u) continue;
+    const id = String(u.id == null ? '' : u.id).trim();
+    if (!id) continue;
+    const o = { id: id };
+    if (u.status != null) o.status = STATUS_KEY[String(u.status).trim()] || STATUS_KEY[String(u.status).trim().toLowerCase()] || 'todo';
+    if (u.priority != null) { const p = String(u.priority).trim(); o.priority = PRIORITY_KEY[p] || PRIORITY_KEY[p.toLowerCase()] || 'medium'; }
+    if (u.title != null) { const t = String(u.title).replace(/\s+/g, ' ').trim(); if (t) o.title = t.slice(0, 120); }
+    if (u.tags != null) o.tags = Array.isArray(u.tags) ? u.tags.map((x) => String(x == null ? '' : x).trim()).filter(Boolean).slice(0, 8) : [];
+    if (u.days != null) { let d = Number(u.days); if (!isFinite(d) || d <= 0) d = 1; if (d > 999) d = 999; o.days = Math.round(d * 100) / 100; }
+    if (u.assignee != null) o.assignee = String(u.assignee).trim();
+    if (u.note != null) o.note = String(u.note).replace(/\s*\n+\s*/g, ' ').trim();
+    if (Object.prototype.hasOwnProperty.call(u, 'start') || Object.prototype.hasOwnProperty.call(u, 'end')) {
+      o.start = u.start == null ? '' : String(u.start).trim();
+      o.end = u.end == null ? '' : String(u.end).trim();
+    }
+    out.push(o);
+  }
+  return out.slice(0, 50);
+}
+
+/** 规范化「删除任务」的工具参数（兼容字符串数组与 {id,title} 数组） */
+function normalizeAiDeletes(raw) {
+  const list = (raw && Array.isArray(raw.tasks)) ? raw.tasks : [];
+  const out = [];
+  for (const t of list) {
+    const isObj = t && typeof t === 'object';
+    const id = String((isObj ? t.id : t) == null ? '' : (isObj ? t.id : t)).trim();
+    if (!id) continue;
+    out.push({ id: id, title: (isObj && t.title != null) ? String(t.title).trim() : '' });
+  }
+  return out.slice(0, 50);
+}
+
+/** 应用排期变更：先删这些任务的旧排期行，再按新值追加（空值=取消排期） */
+function applyScheduleOps(lines, ops) {
+  let sched = findLedgerTable(lines, /排期/);
+  if (!sched) {
+    if (lines.length && lines[lines.length - 1].trim() !== '') lines.push('');
+    lines.push('## 二、排期', '', '| 编号 | 开始 | 结束 |', '| :--- | :--- | :--- |');
+    sched = findLedgerTable(lines, /排期/);
+    if (!sched) return;
+  }
+  const idc = Math.max(0, sched.header.findIndex((h) => /编号|\bid\b/i.test(h)));
+  const idSet = {};
+  ops.forEach((o) => { idSet[o.id] = true; });
+  const rm = [];
+  for (let i = sched.sepIdx + 1; i <= sched.endIdx; i++) { if (idSet[sched.splitRow(lines[i])[idc]]) rm.push(i); }
+  for (let k = rm.length - 1; k >= 0; k--) lines.splice(rm[k], 1);
+  sched = findLedgerTable(lines, /排期/);
+  if (!sched) return;
+  const rows = [];
+  ops.forEach((o) => {
+    if (!o.start || !o.end) return;   // 取消排期则不加行
+    const cols = sched.header.map((h) => {
+      const k = h.toLowerCase();
+      if (/编号|\bid\b/.test(k)) return o.id;
+      if (/开始|start/.test(k)) return o.start;
+      if (/结束|end/.test(k)) return o.end;
+      return '';
+    });
+    rows.push('| ' + cols.join(' | ') + ' |');
+  });
+  if (rows.length) lines.splice(sched.endIdx + 1, 0, ...rows);
+}
+
+/** 修改任务：按表头列名定位，改任务池字段 + 排期 */
+function applyTaskUpdates(content, updates) {
+  const lines = String(content || '').split(/\r?\n/);
+  const pool = findLedgerTable(lines, /任务/);
+  if (!pool) return { content: content, updated: [] };
+  const col = (re) => pool.header.findIndex((h) => re.test(h.toLowerCase()));
+  const cID = Math.max(0, col(/编号|\bid\b/));
+  const cTitle = col(/任务|标题|title/), cStatus = col(/状态|status/), cPrio = col(/优先级|优先|priority/),
+        cTags = col(/标签|tag/), cDays = col(/人天|预估|工作量|天数/), cAssi = col(/负责人|成员|指派|责任人|执行人/), cNote = col(/备注|note|说明/);
+  const idxById = {};
+  for (let i = pool.sepIdx + 1; i <= pool.endIdx; i++) { const c = pool.splitRow(lines[i]); if (c[cID]) idxById[c[cID]] = i; }
+  const updated = [];
+  const schedOps = [];
+  for (const u of updates) {
+    const li = idxById[u.id];
+    if (li == null) continue;
+    const cur = pool.splitRow(lines[li]);
+    if (cTitle >= 0 && u.title != null) cur[cTitle] = mdCell(u.title);
+    if (cStatus >= 0 && u.status != null) cur[cStatus] = STATUS_CN_BY_KEY[u.status] || '未完成';
+    if (cPrio >= 0 && u.priority != null) cur[cPrio] = PRIORITY_CN_BY_KEY[u.priority] || '中';
+    if (cTags >= 0 && u.tags != null) cur[cTags] = mdCell((u.tags || []).join('，'));
+    if (cDays >= 0 && u.days != null) cur[cDays] = String(u.days);
+    if (cAssi >= 0 && u.assignee != null) cur[cAssi] = mdCell(u.assignee);
+    if (cNote >= 0 && u.note != null) cur[cNote] = mdCell(u.note);
+    lines[li] = '| ' + cur.join(' | ') + ' |';
+    if (Object.prototype.hasOwnProperty.call(u, 'start') || Object.prototype.hasOwnProperty.call(u, 'end')) schedOps.push({ id: u.id, start: u.start, end: u.end });
+    const titleNow = (u.title != null) ? u.title : (cTitle >= 0 ? cur[cTitle].replace(/\\\|/g, '|') : u.id);
+    updated.push({ id: u.id, title: titleNow });
+  }
+  if (schedOps.length) applyScheduleOps(lines, schedOps);
+  const out = lines.join('\n').replace(/(>\s*最后更新：).*$/m, '$1' + nowStamp());
+  return { content: out, updated: updated };
+}
+
+/** 删除任务：连排期一起删 */
+function applyTaskDeletes(content, ids) {
+  const lines = String(content || '').split(/\r?\n/);
+  const idSet = {};
+  ids.forEach((x) => { idSet[String(x)] = true; });
+  const deleted = [];
+  const pool = findLedgerTable(lines, /任务/);
+  if (pool) {
+    const cID = Math.max(0, pool.header.findIndex((h) => /编号|\bid\b/i.test(h)));
+    const cTitle = pool.header.findIndex((h) => /任务|标题|title/.test(h.toLowerCase()));
+    const rm = [];
+    for (let i = pool.sepIdx + 1; i <= pool.endIdx; i++) {
+      const c = pool.splitRow(lines[i]);
+      if (idSet[c[cID]]) { rm.push(i); deleted.push({ id: c[cID], title: cTitle >= 0 ? c[cTitle].replace(/\\\|/g, '|') : c[cID] }); }
+    }
+    for (let k = rm.length - 1; k >= 0; k--) lines.splice(rm[k], 1);
+  }
+  const sched = findLedgerTable(lines, /排期/);
+  if (sched) {
+    const cID = Math.max(0, sched.header.findIndex((h) => /编号|\bid\b/i.test(h)));
+    const rm = [];
+    for (let i = sched.sepIdx + 1; i <= sched.endIdx; i++) { if (idSet[sched.splitRow(lines[i])[cID]]) rm.push(i); }
+    for (let k = rm.length - 1; k >= 0; k--) lines.splice(rm[k], 1);
+  }
+  const out = lines.join('\n').replace(/(>\s*最后更新：).*$/m, '$1' + nowStamp());
+  return { content: out, deleted: deleted };
 }
 
 /**
@@ -1066,7 +1284,7 @@ function buildAiSystemPrompt(file, content, opts) {
   const monday = new Date(now); monday.setDate(now.getDate() - wd);
   const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
   return [
-    '你是这个人的私人工作助理，负责帮他梳理、总结、分析工作；当他明确要求时，也通过工具帮他创建任务。',
+    '你是这个人的私人工作助理，负责帮他梳理、总结、分析工作；当他明确要求时，也通过工具帮他创建 / 修改 / 删除任务。',
     '下面是他的一份《AI智能看板》（Markdown 文件）：',
     '  · 「任务池」表：列 = 编号 | 任务 | 状态 | 优先级 | 标签 | 预估人天 | 备注',
     '  · 「排期」表：列 = 编号 | 开始 | 结束',
@@ -1082,7 +1300,16 @@ function buildAiSystemPrompt(file, content, opts) {
     '· 字段规则：状态默认 todo；优先级用户说紧急/重要用 high、说不急/低优先用 low、否则 medium；预估人天拿不准就填 1；标签、负责人只在用户明确提到时填（个人看板没有负责人列）；',
     '· 工具只是「提交待确认」，创建前用户还会二次确认，所以放心调用；',
     '· 若你的回复里还有一句话要说（例如「我识别出 3 条待办」），可放进工具的 note 字段，或直接作为正文输出。',
-    '· 其它情况（闲聊、与台账无关的问题）正常回答即可，不要调用工具。',
+    '',
+    '【修改任务】',
+    '当用户要改已有任务时（标记完成、改状态 / 优先级 / 预估人天、改内容 / 负责人 / 标签，或「排到某天 / 改排期」），调用 update_tasks。',
+    '· id 必须是台账里已存在的编号（如 T3），不要自己新编；只填要改的字段，其余保持不变；',
+    '· 改排期时给 start/end（YYYY-MM-DD）；要取消排期就给两个空字符串。',
+    '',
+    '【删除任务】',
+    '只有用户明确说「删掉 / 删除某个任务」时才调用 delete_tasks，id 必须是台账里已存在的编号；删除会连同该任务的排期一起删。',
+    '',
+    '【其它】闲聊、与台账无关的问题正常回答即可，不要调用工具。以上创建 / 修改 / 删除都会先给用户二次确认，所以放心调用。',
     '',
     '今天日期是 ' + today + '（星期' + wk + '）。本周（周一到周日）是 ' + fmt(monday) + ' 到 ' + fmt(sunday) + '。',
     '涉及日期与星期一律以上面给定的为准，不要自己推算，也不要写错星期；拿不准就先如实说明。',
@@ -1696,18 +1923,41 @@ const server = http.createServer(async (req, res) => {
       let recText = '';
       try {
         const res2 = await streamModelWithTools(cfg, messages, AI_TOOLS, (delta) => { full += delta; push({ delta: delta }); });
-        // 模型决定调用「创建任务」工具：不直接写库，把任务回传前端做二次确认
-        const call = (res2.toolCalls || []).filter((c) => c.name === 'create_tasks')[0];
-        if (call) {
-          const tasks = normalizeAiTasks(call.args);
-          const note = call.args && typeof call.args.note === 'string' ? call.args.note.trim() : '';
+        // 模型决定调用工具：不直接写库，把待确认的操作回传前端
+        const tcs = res2.toolCalls || [];
+        const cCall = tcs.filter((c) => c.name === 'create_tasks')[0];
+        const uCall = tcs.filter((c) => c.name === 'update_tasks')[0];
+        const dCall = tcs.filter((c) => c.name === 'delete_tasks')[0];
+        const noteOf = (call) => (call && call.args && typeof call.args.note === 'string') ? call.args.note.trim() : '';
+        if (cCall) {
+          const tasks = normalizeAiTasks(cCall.args);
           if (!tasks.length) {
             const msg = '我没有从你的要求里识别出可以创建的任务，换个说法、或把内容再贴一次？';
             push({ delta: (full ? '\n\n' : '') + msg });
             recText = full || msg;
           } else {
-            push({ action: { type: 'create_tasks', tasks: tasks, note: note, isTeam: !!b.team, file: fileName } });
+            push({ action: { type: 'create_tasks', tasks: tasks, note: noteOf(cCall), isTeam: !!b.team, file: fileName } });
             recText = full || ('（AI 建议创建 ' + tasks.length + ' 个任务，待确认）');
+          }
+        } else if (uCall) {
+          const updates = normalizeAiUpdates(uCall.args);
+          if (!updates.length) {
+            const msg = '我没识别出要修改哪个任务，麻烦带上任务编号（如 T3）。';
+            push({ delta: (full ? '\n\n' : '') + msg });
+            recText = full || msg;
+          } else {
+            push({ action: { type: 'update_tasks', updates: updates, note: noteOf(uCall), isTeam: !!b.team, file: fileName } });
+            recText = full || ('（AI 建议修改 ' + updates.length + ' 条任务，待确认）');
+          }
+        } else if (dCall) {
+          const dels = normalizeAiDeletes(dCall.args);
+          if (!dels.length) {
+            const msg = '我没识别出要删除哪个任务，麻烦带上任务编号（如 T3）。';
+            push({ delta: (full ? '\n\n' : '') + msg });
+            recText = full || msg;
+          } else {
+            push({ action: { type: 'delete_tasks', tasks: dels, note: noteOf(dCall), isTeam: !!b.team, file: fileName } });
+            recText = full || ('（AI 建议删除 ' + dels.length + ' 个任务，待确认）');
           }
         } else {
           recText = full;
@@ -1740,9 +1990,6 @@ const server = http.createServer(async (req, res) => {
       const b = resolveBoard(req, j.team, j.file);
       if (!b) { sendJson(res, { ok: false, error: 'forbidden' }, 403); return; }
       const action = j.action || {};
-      if (action.type !== 'create_tasks') { sendJson(res, { ok: false, error: '不支持的操作' }, 400); return; }
-      const tasks = normalizeAiTasks({ tasks: action.tasks });
-      if (!tasks.length) { sendJson(res, { ok: false, error: '没有可创建的任务' }, 400); return; }
 
       const dir = b.dir;
       const name = b.file;
@@ -1758,11 +2005,32 @@ const server = http.createServer(async (req, res) => {
           return;
         }
       }
-      const result = appendTasksToLedger(oldText, tasks);
+
+      let result = null, resp = null;
+      if (action.type === 'create_tasks') {
+        const tasks = normalizeAiTasks({ tasks: action.tasks });
+        if (!tasks.length) { sendJson(res, { ok: false, error: '没有可创建的任务' }, 400); return; }
+        result = appendTasksToLedger(oldText, tasks);
+        resp = { created: result.created, count: result.created.length };
+      } else if (action.type === 'update_tasks') {
+        const updates = normalizeAiUpdates({ updates: action.updates });
+        if (!updates.length) { sendJson(res, { ok: false, error: '没有可修改的任务' }, 400); return; }
+        result = applyTaskUpdates(oldText, updates);
+        resp = { updated: result.updated, count: result.updated.length };
+      } else if (action.type === 'delete_tasks') {
+        const dels = normalizeAiDeletes({ tasks: action.tasks });
+        if (!dels.length) { sendJson(res, { ok: false, error: '没有可删除的任务' }, 400); return; }
+        result = applyTaskDeletes(oldText, dels.map((x) => x.id));
+        resp = { deleted: result.deleted, count: result.deleted.length };
+      } else {
+        sendJson(res, { ok: false, error: '不支持的操作' }, 400);
+        return;
+      }
+
       writeData(dir, name, result.content);
       lastTouchedFile = name;
       if (b.team) { try { appendAudit(dir, b.user, diffTasks(oldText, result.content)); } catch (e) { /* 忽略 */ } }
-      sendJson(res, { ok: true, created: result.created, count: result.created.length, mtime: getMTime(dir, name), file: name });
+      sendJson(res, Object.assign({ ok: true, mtime: getMTime(dir, name), file: name }, resp));
       return;
     }
 

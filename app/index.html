@@ -777,6 +777,8 @@ main{
 .ai-abtn{height:32px;padding:0 16px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:.16s;border:1px solid transparent}
 .ai-abtn.primary{background:linear-gradient(140deg,var(--brand-1),var(--brand-2));color:#fff}
 .ai-abtn.primary:hover{filter:brightness(1.06)}
+.ai-abtn.danger{background:linear-gradient(140deg,#d6553f,rgba(192,57,43,.85));color:#fff}
+.ai-abtn.danger:hover{filter:brightness(1.06)}
 .ai-abtn.ghost{background:transparent;border-color:var(--line);color:var(--text-dim)}
 .ai-abtn.ghost:hover{color:var(--text);border-color:var(--line-strong)}
 .ai-abtn:disabled{opacity:.5;cursor:default;filter:none}
@@ -3423,6 +3425,16 @@ main{
     }
   };
   window.__wtkToast = toast;
+  // 供 AI 确认卡片显示「改前 → 改后」
+  window.__wtkTaskInfo = function (id) {
+    const t = state.tasks.filter((x) => x.id === id)[0];
+    if (!t) return null;
+    return {
+      id: t.id, title: t.title, status: t.status, priority: t.priority,
+      tags: (t.tags || []).slice(), days: t.days, assignee: t.assignee || '', note: t.note || '',
+      segs: state.segments.filter((s) => s.taskId === id).map((s) => ({ start: s.start, end: s.end }))
+    };
+  };
 
   /** 删除团队看板（侧边栏 / 团队设置共用） */
   async function deleteTeamBoard(id, name) {
@@ -3899,7 +3911,8 @@ main{
   function showEmpty() {
     chatEl.innerHTML = '<div class="ai-empty"><div class="big">👋 让 AI 帮你梳理工作</div>' +
       '总结分析：“总结一下我本周的任务”、“分析我的工作量分布”；<br>' +
-      '还能帮你建任务：“帮我建个任务：周五前出招商方案，高优先级”，<br>或直接粘贴一段会议纪要，我把里面的待办拆成任务。</div>';
+      '还能帮你建任务：“帮我建个任务：周五前出招商方案，高优先级”，<br>或直接粘贴一段会议纪要，我把里面的待办拆成任务。<br>' +
+      '也能改和删：“把 T3 标记为完成”、“把 T3 排到下周一”、“删掉 T5”——改/删都会先弹出确认。</div>';
   }
 
   function addMsg(role, text) {
@@ -3913,39 +3926,89 @@ main{
     return d;
   }
 
-  /* ---------- 建议操作确认卡片（创建任务） ---------- */
+  /* ---------- 建议操作确认卡片（建 / 改 / 删） ---------- */
   var PRIO_CN = { high: '高', medium: '中', low: '低' };
+  var STATUS_CN = { todo: '未完成', done: '已完成', paused: '已暂停' };
+  var ACTION_META = {
+    create_tasks: { label: '新建任务', verb: '创建', danger: false },
+    update_tasks: { label: '修改任务', verb: '修改', danger: false },
+    delete_tasks: { label: '删除任务', verb: '删除', danger: true }
+  };
 
-  function taskItemHtml(t, i) {
+  function segText(segs) {
+    if (!segs || !segs.length) return '未排期';
+    return segs.map(function (s) { return s.start === s.end ? s.start : (s.start + ' ~ ' + s.end); }).join('、');
+  }
+  function delBtn(i) { return '<button class="ti-del" data-ai-del-task="' + i + '" title="移除这条">✕</button>'; }
+
+  function describeAction(a) {
+    if (!a) return '（等待用户确认）';
+    if (a.type === 'update_tasks') return '（已提出修改任务：' + (a.updates || []).map(function (u) { return u.id; }).join('、') + '，等待用户确认）';
+    if (a.type === 'delete_tasks') return '（已提出删除任务：' + (a.tasks || []).map(function (t) { return t.id; }).join('、') + '，等待用户确认）';
+    return '（已提出待创建任务：' + (a.tasks || []).map(function (t) { return t.title; }).join('、') + '，等待用户确认）';
+  }
+
+  function createItemHtml(t, i) {
     var meta = [];
     meta.push('<span class="prio ' + esc(t.priority || 'medium') + '">' + (PRIO_CN[t.priority] || '中') + '</span>');
     if (t.days) meta.push('<span>' + esc(t.days) + ' 人天</span>');
     if (t.tags && t.tags.length) meta.push('<span>' + esc(t.tags.join('、')) + '</span>');
     if (t.assignee) meta.push('<span>负责人 ' + esc(t.assignee) + '</span>');
-    return '<div class="ai-task-item">' +
-      '<div class="ti-main"><div class="ti-title">' + esc(t.title) + '</div>' +
-      '<div class="ti-meta">' + meta.join('') + '</div>' +
-      (t.note ? '<div class="ti-meta">' + esc(t.note) + '</div>' : '') +
-      '</div>' +
-      '<button class="ti-del" data-ai-del-task="' + i + '" title="移除这条">✕</button>' +
-    '</div>';
+    return '<div class="ai-task-item"><div class="ti-main"><div class="ti-title">' + esc(t.title) + '</div>' +
+      '<div class="ti-meta">' + meta.join('') + '</div>' + (t.note ? '<div class="ti-meta">' + esc(t.note) + '</div>' : '') +
+      '</div>' + delBtn(i) + '</div>';
+  }
+
+  function updateItemHtml(u, i) {
+    var cur = (window.__wtkTaskInfo ? window.__wtkTaskInfo(u.id) : null) || {};
+    var title = u.title || cur.title || u.id;
+    var ch = [];
+    if (u.status != null) ch.push('状态：' + (STATUS_CN[cur.status] || '—') + ' → ' + (STATUS_CN[u.status] || '—'));
+    if (u.priority != null) ch.push('优先级：' + (PRIO_CN[cur.priority] || '—') + ' → ' + (PRIO_CN[u.priority] || '—'));
+    if (u.days != null) ch.push('预估人天：' + (cur.days != null ? cur.days : '—') + ' → ' + u.days);
+    if (u.title != null && u.title !== cur.title) ch.push('标题：' + (cur.title || '—') + ' → ' + u.title);
+    if (u.tags != null) ch.push('标签：' + ((cur.tags || []).join('、') || '无') + ' → ' + ((u.tags || []).join('、') || '无'));
+    if (u.assignee != null) ch.push('负责人：' + (cur.assignee || '无') + ' → ' + (u.assignee || '无'));
+    if (u.note != null) ch.push('备注：' + (cur.note || '无') + ' → ' + (u.note || '无'));
+    if (u.start !== undefined || u.end !== undefined) {
+      var ns = (u.start && u.end) ? (u.start === u.end ? u.start : u.start + ' ~ ' + u.end) : '取消排期';
+      ch.push('排期：' + segText(cur.segs) + ' → ' + ns);
+    }
+    return '<div class="ai-task-item"><div class="ti-main"><div class="ti-title">' + esc(u.id + ' · ' + title) + '</div>' +
+      (ch.length ? ch.map(function (x) { return '<div class="ti-meta">' + esc(x) + '</div>'; }).join('') : '<div class="ti-meta" style="color:var(--text-mute)">（未指明修改内容）</div>') +
+      '</div>' + delBtn(i) + '</div>';
+  }
+
+  function deleteItemHtml(d, i) {
+    var cur = (window.__wtkTaskInfo ? window.__wtkTaskInfo(d.id) : null) || {};
+    var title = d.title || cur.title || '';
+    return '<div class="ai-task-item"><div class="ti-main"><div class="ti-title">' + esc(d.id + (title ? ' · ' + title : '')) + '</div>' +
+      '<div class="ti-meta" style="color:var(--danger)">将删除该任务及其排期</div></div>' + delBtn(i) + '</div>';
+  }
+
+  function itemHtml(type, item, i) {
+    if (type === 'update_tasks') return updateItemHtml(item, i);
+    if (type === 'delete_tasks') return deleteItemHtml(item, i);
+    return createItemHtml(item, i);
   }
 
   /** state: 'pending' | 'done' | 'cancelled' */
   function renderCard(card, state) {
-    var tasks = card.__tasks || [];
+    var type = card.__type || 'create_tasks';
+    var meta = ACTION_META[type] || ACTION_META.create_tasks;
+    var items = card.__items || [];
     var inner;
     if (state === 'done') {
       inner = '<div class="ai-action-done">✅ ' + esc(card.__doneMsg || '已完成') + '</div>';
     } else if (state === 'cancelled') {
-      inner = '<div class="ai-action-done" style="color:var(--text-mute)">已取消，未创建任何任务</div>';
+      inner = '<div class="ai-action-done" style="color:var(--text-mute)">已取消，未做任何改动</div>';
     } else {
-      inner = '<div class="ai-action-name">' + (card.__isTeam ? '新建任务（团队看板）' : '新建任务') + ' · 共 ' + tasks.length + ' 条</div>' +
-        (tasks.length
-          ? tasks.map(taskItemHtml).join('')
-          : '<div class="ai-task-item"><div class="ti-main"><div class="ti-title" style="color:var(--text-mute)">（已移除全部，无法创建）</div></div></div>') +
+      inner = '<div class="ai-action-name">' + meta.label + (card.__isTeam ? '（团队看板）' : '') + ' · 共 ' + items.length + ' 条</div>' +
+        (items.length
+          ? items.map(function (it, i) { return itemHtml(type, it, i); }).join('')
+          : '<div class="ai-task-item"><div class="ti-main"><div class="ti-title" style="color:var(--text-mute)">（已移除全部）</div></div></div>') +
         '<div class="ai-action-btns">' +
-          '<button class="ai-abtn primary" data-ai-confirm' + (tasks.length ? '' : ' disabled') + '>确认创建</button>' +
+          '<button class="ai-abtn ' + (meta.danger ? 'danger' : 'primary') + '" data-ai-confirm' + (items.length ? '' : ' disabled') + '>确认' + meta.verb + '</button>' +
           '<button class="ai-abtn ghost" data-ai-cancel>取消</button>' +
         '</div>';
     }
@@ -3962,43 +4025,56 @@ main{
     }
     var card = document.createElement('div');
     card.className = 'ai-action-card';
-    card.__tasks = (action.tasks || []).slice();
+    card.__type = action.type || 'create_tasks';
     card.__isTeam = !!action.isTeam;
+    card.__items = (action.type === 'update_tasks' ? (action.updates || []) : (action.tasks || [])).slice();
     bub.appendChild(card);
     renderCard(card, 'pending');
     scrollBottom();
     return card;
   }
 
-  /** 确认创建：把卡片上的任务提交到后端落库 */
-  async function confirmCreate(card) {
-    var tasks = card.__tasks || [];
-    if (!tasks.length) return;
+  function actionPayload(card) {
+    if (card.__type === 'update_tasks') return { type: 'update_tasks', updates: card.__items };
+    if (card.__type === 'delete_tasks') return { type: 'delete_tasks', tasks: card.__items };
+    return { type: 'create_tasks', tasks: card.__items };
+  }
+
+  /** 确认并提交卡片上的操作 */
+  async function confirmAction(card) {
+    var items = card.__items || [];
+    if (!items.length) return;
     var btns = card.querySelectorAll('.ai-action-btns button');
     for (var i = 0; i < btns.length; i++) btns[i].disabled = true;
     var okBtn = card.querySelector('[data-ai-confirm]');
-    if (okBtn) okBtn.textContent = '创建中…';
+    if (okBtn) okBtn.textContent = '提交中…';
     try {
       var r = await fetch('/api/ai/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ team: aiTeam(), file: aiCurrentFile(), action: { type: 'create_tasks', tasks: tasks } })
+        body: JSON.stringify({ team: aiTeam(), file: aiCurrentFile(), action: actionPayload(card) })
       });
       var j = await r.json();
       if (!j || !j.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
-      var created = j.created || [];
-      card.__doneMsg = '已创建 ' + created.length + ' 个任务：' + created.map(function (t) { return t.id + ' ' + t.title; }).join('、');
-      if (lastActionNoteIdx >= 0 && history[lastActionNoteIdx]) {
-        history[lastActionNoteIdx].content = '（用户已确认，已创建任务：' + created.map(function (t) { return t.id + ' ' + t.title; }).join('、') + '）';
+      if (card.__type === 'update_tasks') {
+        var up = j.updated || [];
+        card.__doneMsg = up.length ? ('已修改 ' + up.length + ' 条任务：' + up.map(function (t) { return t.id; }).join('、')) : '没有匹配到可修改的任务（编号可能不存在）';
+      } else if (card.__type === 'delete_tasks') {
+        var de = j.deleted || [];
+        card.__doneMsg = de.length ? ('已删除 ' + de.length + ' 个任务：' + de.map(function (t) { return t.id + ' ' + t.title; }).join('、')) : '没有匹配到可删除的任务（编号可能不存在）';
+      } else {
+        var cr = j.created || [];
+        card.__doneMsg = '已创建 ' + cr.length + ' 个任务：' + cr.map(function (t) { return t.id + ' ' + t.title; }).join('、');
       }
+      if (lastActionNoteIdx >= 0 && history[lastActionNoteIdx]) history[lastActionNoteIdx].content = '（用户已确认，' + card.__doneMsg + '）';
       renderCard(card, 'done');
       if (window.__wtkReloadBoard) { try { await window.__wtkReloadBoard(); } catch (e) { /* 忽略 */ } }
-      if (window.__wtkToast) window.__wtkToast('AI 帮你建了 ' + created.length + ' 个任务');
+      if (window.__wtkToast) window.__wtkToast('AI 已按你的确认完成操作');
     } catch (err) {
       renderCard(card, 'pending');
       var e2 = document.createElement('div');
       e2.className = 'ai-action-err';
-      e2.textContent = '创建失败：' + (err && err.message ? err.message : err);
+      e2.textContent = '操作失败：' + (err && err.message ? err.message : err);
       card.appendChild(e2);
     }
   }
@@ -4007,6 +4083,7 @@ main{
   async function send(text) {
     text = (text || '').trim();
     if (!text || busy) return;
+    if (!configLoaded) { try { await loadConfig(); } catch (e) { /* 忽略 */ } }
     if (!keyConfigured) { addMsg('ai', '⚠️ 还没配置 API Key，点右上角齿轮设置一下。'); openSettings(); return; }
 
     addMsg('user', text);
@@ -4051,8 +4128,7 @@ main{
               if (ev.error) { acc += (acc ? '\n\n' : '') + '⚠️ ' + ev.error; bub.innerHTML = mdToHtml(acc); scrollBottom(); }
               if (ev.action) {
                 hasAction = true;
-                var titles = (ev.action.tasks || []).map(function (t) { return t.title; });
-                actionNote = '（已提出待创建任务：' + titles.join('、') + '，等待用户确认）';
+                actionNote = describeAction(ev.action);
                 mountActionCard(bub, ev.action, acc ? mdToHtml(acc) : '');
               }
             } catch (e) { /* 忽略半截事件 */ }
@@ -4075,20 +4151,23 @@ main{
   }
 
   /* ---------- 设置 ---------- */
+  var configLoaded = false;
   async function loadConfig() {
     try {
       var r = await fetch('/api/ai/config', { cache: 'no-store' });
       var j = await r.json();
-      if (!j || !j.ok) return;
-      providers = j.providers || [];
-      keyConfigured = !!j.hasKey;
-      if ($('aiAcctHint')) $('aiAcctHint').textContent = '设置按登录账号保存，每个账号各自独立' + (j.user ? '（当前账号：' + j.user + '）' : '') + '。';
-      fillProviderSelect(j.provider);
-      $('aiModel').value = j.model || '';
-      $('aiBase').value = j.baseUrl || '';
-      updateKeyHint(j);
-      updateModelList();
+      if (j && j.ok) {
+        providers = j.providers || [];
+        keyConfigured = !!j.hasKey;
+        if ($('aiAcctHint')) $('aiAcctHint').textContent = '设置按登录账号保存，每个账号各自独立' + (j.user ? '（当前账号：' + j.user + '）' : '') + '。';
+        fillProviderSelect(j.provider);
+        $('aiModel').value = j.model || '';
+        $('aiBase').value = j.baseUrl || '';
+        updateKeyHint(j);
+        updateModelList();
+      }
     } catch (e) { /* 忽略 */ }
+    configLoaded = true;
   }
 
   function fillProviderSelect(sel) {
@@ -4243,14 +4322,14 @@ main{
       var del = e.target.closest('[data-ai-del-task]');
       if (del) {
         var i = parseInt(del.getAttribute('data-ai-del-task'), 10);
-        if (!isNaN(i)) { card.__tasks.splice(i, 1); renderCard(card, 'pending'); }
+        if (!isNaN(i)) { card.__items.splice(i, 1); renderCard(card, 'pending'); }
         return;
       }
       if (e.target.closest('[data-ai-cancel]')) {
-        if (lastActionNoteIdx >= 0 && history[lastActionNoteIdx]) history[lastActionNoteIdx].content = '（用户取消了创建任务）';
+        if (lastActionNoteIdx >= 0 && history[lastActionNoteIdx]) history[lastActionNoteIdx].content = '（用户取消了操作）';
         renderCard(card, 'cancelled'); return;
       }
-      if (e.target.closest('[data-ai-confirm]')) { confirmCreate(card); }
+      if (e.target.closest('[data-ai-confirm]')) { confirmAction(card); }
     });
 
     var exp = $('btnExport');
