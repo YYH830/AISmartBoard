@@ -1007,11 +1007,8 @@ main{
           <button class="tab" type="button" data-rtab="ai">AI 智能分析</button>
         </div>
         <div class="spacer"></div>
-        <button class="icon-btn" id="aiNewBtn" title="新对话（清空当前对话，历史记录仍保留）" style="display:none">
+        <button class="icon-btn" id="aiNewBtn" title="新对话（清空当前对话）" style="display:none">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-        </button>
-        <button class="icon-btn" id="aiHistBtn" title="历史记录" style="display:none">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4.5l3 1.8"/></svg>
         </button>
         <button class="icon-btn" id="btnPoolCollapse" title="收起任务池">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 6l5.5 6L7 18"/><path d="M13.5 6L19 12l-5.5 6"/></svg>
@@ -4327,7 +4324,6 @@ main{
     for (var i = 0; i < btns.length; i++) {
       btns[i].classList.toggle('active', btns[i].getAttribute('data-rtab') === name);
     }
-    var hb = $('aiHistBtn'); if (hb) hb.style.display = isAi ? '' : 'none';
     var nb = $('aiNewBtn'); if (nb) nb.style.display = isAi ? '' : 'none';
     if (isAi) {
       loadConfig();
@@ -4354,7 +4350,7 @@ main{
       resetChat();
       restored = true;                       // 手动新开对话后，不再自动载入历史
       chatBoardKey = currentBoardKey();
-      if (window.__wtkToast) window.__wtkToast('已开启新对话（历史记录仍可在右上角查看）');
+      if (window.__wtkToast) window.__wtkToast('已开启新对话');
       if (textEl) textEl.focus();
     };
     // 恢复上次停留的标签页（默认任务池）
@@ -4411,7 +4407,6 @@ main{
       updateModelList();
     });
 
-    $('aiHistBtn').onclick = openHistory;
     $('aiHistClose').onclick = closeHistory;
     $('aiHistClose2').onclick = closeHistory;
     $('aiHistBackdrop').addEventListener('click', function (e) { if (e.target === this) closeHistory(); });
