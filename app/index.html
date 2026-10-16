@@ -3805,6 +3805,7 @@ main{
 
   var chatEl, formEl, textEl, sendBtn;
   var history = [];          // 会话历史 {role, content}
+  var lastActionNoteIdx = -1; // 上一条「待创建任务」assistant 消息在 history 里的下标
   var busy = false;
   var providers = [];
   var keyConfigured = false;
@@ -3960,6 +3961,9 @@ main{
       if (!j || !j.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
       var created = j.created || [];
       card.__doneMsg = '已创建 ' + created.length + ' 个任务：' + created.map(function (t) { return t.id + ' ' + t.title; }).join('、');
+      if (lastActionNoteIdx >= 0 && history[lastActionNoteIdx]) {
+        history[lastActionNoteIdx].content = '（用户已确认，已创建任务：' + created.map(function (t) { return t.id + ' ' + t.title; }).join('、') + '）';
+      }
       renderCard(card, 'done');
       if (window.__wtkReloadBoard) { try { await window.__wtkReloadBoard(); } catch (e) { /* 忽略 */ } }
       if (window.__wtkToast) window.__wtkToast('AI 帮你建了 ' + created.length + ' 个任务');
@@ -3988,6 +3992,7 @@ main{
     busy = true; sendBtn.disabled = true;
     var acc = '';
     var hasAction = false;
+    var actionNote = '';
 
     try {
       var r = await fetch('/api/ai/chat', {
@@ -4017,13 +4022,19 @@ main{
               var ev = JSON.parse(payload);
               if (ev.delta) { acc += ev.delta; if (!hasAction) { bub.innerHTML = mdToHtml(acc); scrollBottom(); } }
               if (ev.error) { acc += (acc ? '\n\n' : '') + '⚠️ ' + ev.error; bub.innerHTML = mdToHtml(acc); scrollBottom(); }
-              if (ev.action) { hasAction = true; mountActionCard(bub, ev.action, acc ? mdToHtml(acc) : ''); }
+              if (ev.action) {
+                hasAction = true;
+                var titles = (ev.action.tasks || []).map(function (t) { return t.title; });
+                actionNote = '（已提出待创建任务：' + titles.join('、') + '，等待用户确认）';
+                mountActionCard(bub, ev.action, acc ? mdToHtml(acc) : '');
+              }
             } catch (e) { /* 忽略半截事件 */ }
           }
         }
       }
-      if (acc) history.push({ role: 'assistant', content: acc });
-      else if (!hasAction) bub.innerHTML = '<p style="color:var(--text-mute)">（没有返回内容）</p>';
+      if (acc) { history.push({ role: 'assistant', content: acc }); lastActionNoteIdx = -1; }
+      else if (hasAction) { history.push({ role: 'assistant', content: actionNote }); lastActionNoteIdx = history.length - 1; }
+      else bub.innerHTML = '<p style="color:var(--text-mute)">（没有返回内容）</p>';
     } catch (e) {
       bub.innerHTML = '<p style="color:var(--danger)">请求失败：' + esc(e && e.message ? e.message : e) + '</p>';
     } finally {
@@ -4208,7 +4219,10 @@ main{
         if (!isNaN(i)) { card.__tasks.splice(i, 1); renderCard(card, 'pending'); }
         return;
       }
-      if (e.target.closest('[data-ai-cancel]')) { renderCard(card, 'cancelled'); return; }
+      if (e.target.closest('[data-ai-cancel]')) {
+        if (lastActionNoteIdx >= 0 && history[lastActionNoteIdx]) history[lastActionNoteIdx].content = '（用户取消了创建任务）';
+        renderCard(card, 'cancelled'); return;
+      }
       if (e.target.closest('[data-ai-confirm]')) { confirmCreate(card); }
     });
 
