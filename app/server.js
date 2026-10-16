@@ -629,6 +629,12 @@ function isAuthed(req) {
   return !!authedEntry(req);
 }
 
+/** 未登录也可访问的公开静态资源（落地页截图 / 图标等），否则未登录一律回登录页 */
+function isPublicAsset(p) {
+  if (p === '/favicon.svg') return true;
+  return p.indexOf('/assets/') === 0 && /\.(png|jpe?g|webp|gif|svg|ico)$/i.test(p);
+}
+
 /** 登录成功：下发登录 Cookie（HttpOnly，脚本读不到，降低被窃取的风险） */
 function setAuthCookie(res, u, p) {
   // 鉴权 Cookie 保持 HttpOnly；另发一个非 HttpOnly 的 wtk_user（仅账号名），供前端做「按账号隔离」的本地设置
@@ -1497,8 +1503,8 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // ---------- 访问保护：未通过验证一律挡在外面 ----------
-    if (!isAuthed(req)) {
+    // ---------- 访问保护：未通过验证一律挡在外面（公开静态资源除外） ----------
+    if (!isAuthed(req) && !isPublicAsset(pathname)) {
       if (pathname.indexOf('/api/') === 0) {
         sendJson(res, { ok: false, error: 'unauthorized', needLogin: true }, 401);
       } else {
