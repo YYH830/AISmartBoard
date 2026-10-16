@@ -865,11 +865,11 @@ main{
 
 /* ============================== AI 智能分析：侧边按钮 + 右侧滑出面板 ============================== */
 /* 右侧留出一条栏给悬浮按钮，避免盖住面板内容/滚动条 */
-.app{padding-right:28px}
+.app{padding-right:32px}
 /* 贴着右缘的竖条按钮，点一下把 AI 面板滑出 / 收起 */
 .ai-edge{
   position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:70;
-  width:28px;
+  width:32px;
   display:flex;flex-direction:column;align-items:center;gap:8px;
   padding:15px 0;border:none;cursor:pointer;
   border-radius:14px 0 0 14px;
@@ -880,7 +880,7 @@ main{
 .ai-edge:hover{filter:brightness(1.06)}
 .ai-edge:active{filter:brightness(.97)}
 .ai-edge svg{width:17px;height:17px;flex:none}
-.ai-edge span{writing-mode:vertical-rl;text-orientation:upright;font-size:11.5px;font-weight:650;letter-spacing:2px}
+.ai-edge span{font-size:12.5px;font-weight:650;letter-spacing:0;line-height:1.35;text-align:center}
 .ai-edge.active{background:var(--panel);color:var(--brand-1);border:1px solid var(--line);border-right:0;box-shadow:-12px 0 26px -16px rgba(60,40,20,.42)}
 
 /* AI 面板：与任务池同一栏、同尺寸；默认隐藏，ai-open 时从右侧滑入 */
@@ -1090,9 +1090,9 @@ main{
   </main>
 
   <!-- ================= AI 侧边悬浮按钮 ================= -->
-  <button class="ai-edge" id="aiEdge" title="AI 智能分析">
+  <button class="ai-edge" id="aiEdge" title="AI 智能分析" aria-label="AI 智能分析">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.9L18.8 9.7l-4.9 1.9L12 16.5l-1.9-4.9L5.2 9.7l4.9-1.9z"/><path d="M18.6 15.6l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg>
-    <span>AI 智能分析</span>
+    <span>AI<br>智能<br>分析</span>
   </button>
 
   <!-- ================= 看板设置（统一入口：个性化 / 日历 / AI） =================
