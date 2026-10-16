@@ -2907,19 +2907,22 @@ main{
     const as = $('mAssign'); if (as) modalState.assignee = as.value;
   }
 
+  /** 排期行的 HTML（渲染与「增量新增」共用，避免整窗重绘导致闪烁） */
+  function schedRowHTML(i, s) {
+    return '<div class="sched-row" data-i="' + i + '">' +
+      '<input type="date" data-sched="start" value="' + s.start + '">' +
+      '<span>~</span>' +
+      '<input type="date" data-sched="end" value="' + s.end + '">' +
+      '<button class="icon-btn" data-rmseg="' + i + '" title="删除这段排期">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
+      '</button>' +
+    '</div>';
+  }
+
   function renderModal() {
     captureModalForm();
     const m = modalState;
-    const segRows = m._segs.map((s, i) =>
-      '<div class="sched-row" data-i="' + i + '">' +
-        '<input type="date" data-sched="start" value="' + s.start + '">' +
-        '<span>~</span>' +
-        '<input type="date" data-sched="end" value="' + s.end + '">' +
-        '<button class="icon-btn" data-rmseg="' + i + '" title="删除这段排期">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
-        '</button>' +
-      '</div>'
-    ).join('');
+    const segRows = m._segs.map((s, i) => schedRowHTML(i, s)).join('');
 
     const root = document.createElement('div');
     root.className = 'backdrop';
@@ -2985,6 +2988,26 @@ main{
 
   function bindModal(root) {
     const close = () => { const el = $('backdrop'); if (el) el.remove(); modalState = null; };
+    const segsBox = () => root.querySelector('#mSegs');
+    const reindexSegs = () => {
+      const rows = segsBox().querySelectorAll('.sched-row');
+      for (let k = 0; k < rows.length; k++) {
+        rows[k].dataset.i = k;
+        const rb = rows[k].querySelector('[data-rmseg]');
+        if (rb) rb.dataset.rmseg = k;
+      }
+    };
+    // 增量新增一段排期行（不重建整窗，避免闪烁）
+    const addSegRow = () => {
+      const box = segsBox();
+      const hint = box.querySelector('.hintline'); if (hint) hint.remove();
+      const idx = modalState._segs.length;
+      const s = { start: today(), end: today() };
+      modalState._segs.push(s);
+      const tmp = document.createElement('div');
+      tmp.innerHTML = schedRowHTML(idx, s);
+      box.appendChild(tmp.firstChild);
+    };
     root.addEventListener('click', (e) => {
       if (e.target === root || e.target.closest('[data-close]')) { close(); return; }
       const st = e.target.closest('[data-st]');
@@ -3002,11 +3025,20 @@ main{
         return;
       }
       const rm = e.target.closest('[data-rmseg]');
-      if (rm) { modalState._segs.splice(+rm.dataset.rmseg, 1); renderModal(); return; }
-      if (e.target.closest('#mAddSeg')) {
-        modalState._segs.push({ start: today(), end: today() });
-        renderModal(); return;
+      if (rm) {
+        const row = rm.closest('.sched-row');
+        modalState._segs.splice(+row.dataset.i, 1);
+        row.remove();
+        reindexSegs();
+        if (!segsBox().querySelector('.sched-row')) {
+          const hint = document.createElement('div');
+          hint.className = 'hintline';
+          hint.textContent = '尚未排期，添加一段日期后会显示在日历上。';
+          segsBox().appendChild(hint);
+        }
+        return;
       }
+      if (e.target.closest('#mAddSeg')) { addSegRow(); return; }
       if (e.target.closest('#mDel')) {
         const id = modalState.id;
         deleteTask(id).then((ok) => { if (ok) close(); });
@@ -3014,14 +3046,19 @@ main{
       }
       if (e.target.closest('#mSave')) { commitModal(close); return; }
     });
-    // 排期日期输入实时同步到内存，保证重渲染不丢
+    // 排期日期输入实时同步到内存；只改对应行，不重绘整窗
     root.addEventListener('change', (e) => {
       const inp = e.target.closest('[data-sched]');
       if (!inp) return;
-      const i = +inp.closest('.sched-row').dataset.i;
-      modalState._segs[i][inp.dataset.sched] = inp.value || today();
-      if (modalState._segs[i].end < modalState._segs[i].start) modalState._segs[i].end = modalState._segs[i].start;
-      renderModal();
+      const row = inp.closest('.sched-row');
+      const seg = modalState._segs[+row.dataset.i];
+      if (!seg) return;
+      seg[inp.dataset.sched] = inp.value || today();
+      if (seg.end < seg.start) {
+        seg.end = seg.start;
+        const eInp = row.querySelector('[data-sched="end"]');
+        if (eInp) eInp.value = seg.end;
+      }
     });
     root.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { commitModal(close); }
