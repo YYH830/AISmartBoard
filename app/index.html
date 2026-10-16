@@ -706,6 +706,13 @@ main{
 .tabs .tab.active{color:var(--brand-1);background:rgba(194,84,47,.10);border-color:rgba(194,84,47,.22)}
 .tabs .tab .count{font-size:11px;font-weight:600;color:var(--text-dim);background:var(--panel-2);border:1px solid var(--line);border-radius:20px;padding:1px 8px}
 
+/* 右侧面板标签（任务池 / AI 助手）：分段控件风 */
+#rightTabs{display:inline-flex;gap:2px;padding:3px;border-radius:11px;background:var(--panel-2);border:1px solid var(--line);flex:none;flex-wrap:wrap}
+#rightTabs .tab{height:26px;padding:0 13px;border-radius:8px;font-size:12.5px;font-weight:650;color:var(--text-mute);background:transparent;border:0;transition:color .16s,background .16s,box-shadow .16s;display:flex;align-items:center;gap:6px}
+#rightTabs .tab:hover{color:var(--text)}
+#rightTabs .tab.active{color:#fff;background:linear-gradient(140deg,var(--brand-1),var(--brand-2));box-shadow:0 6px 14px -8px var(--brand-1)}
+#rightTabs .tab.active .count{background:rgba(255,255,255,.25);border-color:transparent;color:#fff}
+
 /* 右侧面板：任务池 / AI 对话 两个子面板，互斥显示 */
 .poolPane,.aiPane{flex:1;min-height:0;display:flex;flex-direction:column}
 .ai-headtools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -728,6 +735,8 @@ main{
 .ai-msg.ai blockquote{margin:7px 0;padding:6px 11px;border-left:3px solid var(--line-strong);color:var(--text-mute);background:var(--panel-2);border-radius:0 8px 8px 0}
 .ai-empty{align-self:center;margin:auto;text-align:center;color:var(--text-mute);font-size:13px;line-height:2;padding:20px}
 .ai-empty .big{font-size:15px;color:var(--text-dim);font-weight:600;margin-bottom:8px}
+.ai-empty-sub{line-height:1.9}
+.ai-empty .ai-quick{justify-content:center;padding:16px 0 0;gap:8px}
 .ai-typing{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text-mute);animation:blink 1s infinite}
 @keyframes blink{0%,100%{opacity:.25}50%{opacity:1}}
 .ai-quick{display:flex;gap:8px;padding:4px 20px 12px;flex-wrap:wrap}
@@ -867,7 +876,7 @@ main{
 #boardView.pool-collapsed #poolPanel{display:none}
 @media (max-width:900px){ #boardView.pool-collapsed{grid-template-rows:minmax(320px,1fr)} }
 
-/* ============================== AI 助理（右侧标签页） ============================== */
+/* ============================== AI 助手（右侧标签页） ============================== */
 /* AI 与任务池共用一块面板，用顶部标签切换；默认显示任务池 */
 #aiPane{display:none}
 #aiPane .ai-chat{padding:18px 18px 6px}
@@ -999,12 +1008,12 @@ main{
       </div>
     </section>
 
-    <!-- 右：任务池 / AI 助理（同一面板，顶部标签切换） -->
+    <!-- 右：任务池 / AI 助手（同一面板，顶部标签切换） -->
     <section class="panel" id="poolPanel">
       <div class="pane-head pool-head">
         <div class="tabs" id="rightTabs">
           <button class="tab active" type="button" data-rtab="pool">任务池 <span class="count" id="poolCount"></span></button>
-          <button class="tab" type="button" data-rtab="ai">AI 助理</button>
+          <button class="tab" type="button" data-rtab="ai">AI 助手</button>
         </div>
         <div class="spacer"></div>
         <button class="icon-btn" id="aiNewBtn" title="新对话（清空当前对话）" style="display:none">
@@ -1037,12 +1046,6 @@ main{
 
       <div class="aiPane" id="aiPane">
         <div class="ai-chat" id="aiChat"></div>
-        <div class="ai-quick" id="aiQuick">
-          <button data-q="帮我总结一下本周（本周一到今天）的工作任务">总结本周</button>
-          <button data-q="帮我分析一下我目前的工作量分布和整体进度">分析工作量</button>
-          <button data-q="我有哪些任务已经逾期，或者最近要到期了？">逾期 / 临期</button>
-          <button data-q="帮我建个任务：周五前整理一份招商方案，高优先级，预估 3 人天">建任务</button>
-        </div>
         <form class="ai-input" id="aiForm">
           <div class="ai-inputbox">
             <textarea id="aiText" rows="1" placeholder="总结、分析，或直接让我建任务；例：「帮我建个任务：周五前出招商方案，高优先级」"></textarea>
@@ -3421,7 +3424,7 @@ main{
   window.openBoardSettings = openBoardSettings;
   window.closeBoardSettings = closeBoardSettings;
 
-  // 暴露给第二段脚本（AI 助理）：AI 创建任务后刷新当前看板 / 弹顶层提示
+  // 暴露给第二段脚本（AI 助手）：AI 创建任务后刷新当前看板 / 弹顶层提示
   window.__wtkReloadBoard = async function () {
     try { if (dirty) await Store.save(true); } catch (e) { /* 忽略 */ }
     if (Store.mode === 'server') {
@@ -3916,10 +3919,17 @@ main{
   function scrollBottom() { if (chatEl) chatEl.scrollTop = chatEl.scrollHeight; }
 
   function showEmpty() {
-    chatEl.innerHTML = '<div class="ai-empty"><div class="big">👋 让 AI 帮你梳理工作</div>' +
-      '总结分析：“总结一下我本周的任务”、“分析我的工作量分布”；<br>' +
-      '还能帮你建任务：“帮我建个任务：周五前出招商方案，高优先级”，<br>或直接粘贴一段会议纪要，我把里面的待办拆成任务。<br>' +
-      '也能改和删：“把 T3 标记为完成”、“把 T3 排到下周一”、“删掉 T5”——改/删都会先弹出确认。</div>';
+    chatEl.innerHTML =
+      '<div class="ai-empty">' +
+        '<div class="big">👋 我是你的 AI 助手</div>' +
+        '<div class="ai-empty-sub">总结、分析、建任务、改任务、删任务都能帮你；也可以直接粘贴一段会议纪要，我把待办拆成任务。<br>不知道从哪问起？点一个试试 👇</div>' +
+        '<div class="ai-quick">' +
+          '<button data-q="帮我总结一下本周（本周一到今天）的工作任务">总结本周</button>' +
+          '<button data-q="帮我分析一下我目前的工作量分布和整体进度">分析工作量</button>' +
+          '<button data-q="我有哪些任务已经逾期，或者最近要到期了？">逾期 / 临期</button>' +
+          '<button data-q="帮我建个任务：周五前整理一份招商方案，高优先级，预估 3 人天">建任务</button>' +
+        '</div>' +
+      '</div>';
   }
 
   function addMsg(role, text) {
@@ -4277,7 +4287,7 @@ main{
   }
   function closeHistory() { $('aiHistBackdrop').style.display = 'none'; }
 
-  /* ---------- 右侧标签页：任务池 / AI 助理 ---------- */
+  /* ---------- 右侧标签页：任务池 / AI 助手 ---------- */
   function currentBoardKey() { return (aiTeam() || '') + '|' + aiCurrentFile(); }
 
   /** 清空当前对话（仅清前端，不动服务端历史存档） */
@@ -4364,13 +4374,10 @@ main{
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(textEl.value); }
     });
 
-    $('aiQuick').addEventListener('click', function (e) {
-      var b = e.target.closest ? e.target.closest('button[data-q]') : null;
-      if (b) send(b.dataset.q);
-    });
-
-    // 确认卡片：确认创建 / 取消 / 移除某条
+    // 会话中的引导快捷按钮 / 确认卡片点击
     chatEl.addEventListener('click', function (e) {
+      var qb = e.target.closest ? e.target.closest('button[data-q]') : null;
+      if (qb) { send(qb.getAttribute('data-q')); return; }
       var card = e.target.closest ? e.target.closest('.ai-action-card') : null;
       if (!card) return;
       var del = e.target.closest('[data-ai-del-task]');
