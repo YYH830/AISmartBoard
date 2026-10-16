@@ -1351,12 +1351,37 @@ main{
   /** 是否工作日：调休上班优先，其次法定节假日，最后看是否周末 */
   const isWorkday = (d) => isMakeup(d) ? true : (isHoliday(d) ? false : !isWeekendDay(d));
 
+  /* ---------------------------- 本地存储：按登录账号隔离 ----------------------------
+   * 账号名由服务端下发的可读 Cookie（wtk_user）提供；拿不到时退回全局键名。
+   * 所有「界面设置」都通过 lsGet/lsSet 读写 → 同一浏览器、不同账号各自一套。
+   * 旧版没带后缀的设置，首次访问会自动迁移到当前账号名下。
+   */
+  const ACCT = (() => {
+    try { const m = document.cookie.match(/(?:^|;\s*)wtk_user=([^;]+)/); return m ? decodeURIComponent(m[1]) : ''; }
+    catch (e) { return ''; }
+  })();
+  const lsKey = (base) => (ACCT ? base + '@' + ACCT : base);
+  const lsGet = (base) => { try { return localStorage.getItem(lsKey(base)); } catch (e) { return null; } };
+  const lsSet = (base, val) => { try { localStorage.setItem(lsKey(base), val); } catch (e) { /* 忽略 */ } };
+  const lsDel = (base) => { try { localStorage.removeItem(lsKey(base)); } catch (e) { /* 忽略 */ } };
+  window.__wtkLs = { get: lsGet, set: lsSet, del: lsDel, key: lsKey, acct: () => ACCT };
+  (function migrateLegacyLocal() {
+    if (!ACCT) return;
+    ['wtk-theme', 'wtk-cat', 'wtk-cat-config', 'wtk-sched', 'wtk-cal-fields', 'wtk-pool-prefs'].forEach((base) => {
+      try {
+        if (localStorage.getItem(lsKey(base)) == null && localStorage.getItem(base) != null) {
+          localStorage.setItem(lsKey(base), localStorage.getItem(base));
+        }
+      } catch (e) { /* 忽略 */ }
+    });
+  })();
+
   // 排期计算方式：'natural' 自然日 / 'workday' 工作日（跳过周末+法定节假日，含调休上班）
   let schedMode = 'natural';
-  try { const _sm = localStorage.getItem('wtk-sched'); if (_sm === 'workday' || _sm === 'natural') schedMode = _sm; } catch (e) { /* 忽略 */ }
+  try { const _sm = lsGet('wtk-sched'); if (_sm === 'workday' || _sm === 'natural') schedMode = _sm; } catch (e) { /* 忽略 */ }
   // 日历任务条展示字段（任务名称始终展示）
   let calFields = { prio: false, tags: false, days: false };
-  try { const _cf = JSON.parse(localStorage.getItem('wtk-cal-fields') || 'null'); if (_cf && typeof _cf === 'object') calFields = Object.assign(calFields, _cf); } catch (e) { /* 忽略 */ }
+  try { const _cf = JSON.parse(lsGet('wtk-cal-fields') || 'null'); if (_cf && typeof _cf === 'object') calFields = Object.assign(calFields, _cf); } catch (e) { /* 忽略 */ }
   const uid = (p) => p + Date.now().toString(36).slice(-4) + Math.random().toString(36).slice(2, 6);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const shortDate = (s) => { const d = parseDate(s); return (d.getMonth() + 1) + '月' + d.getDate() + '日'; };
@@ -1605,11 +1630,11 @@ main{
             return;
           }
           // 恢复上次的团队看板
-          let wantedTeam = null; try { wantedTeam = localStorage.getItem('wtk-team'); } catch (e) { /* 忽略 */ }
+          let wantedTeam = null; try { wantedTeam = lsGet('wtk-team'); } catch (e) { /* 忽略 */ }
           if (wantedTeam && this.teams.some((t) => t.id === wantedTeam)) { await this.loadBoard(null, wantedTeam); return; }
           // 恢复上次使用的个人台账；若已不存在，退回默认台账或列表里的第一个
           const exists = (n) => !!n && this.files.some((f) => f.name === n);
-          const wanted = localStorage.getItem('wtk-file');
+          const wanted = lsGet('wtk-file');
           let name = null;
           if (exists(wanted)) name = wanted;
           else if (exists('tasks.md')) name = 'tasks.md';
@@ -1681,8 +1706,8 @@ main{
       this.file = j.file || name;
       this.mtime = j.mtime;
       this.pathLabel = j.path || this.file;
-      localStorage.setItem('wtk-file', this.file);
-      try { if (this.team) localStorage.setItem('wtk-team', this.team); else localStorage.removeItem('wtk-team'); } catch (e) { /* 忽略 */ }
+      lsSet('wtk-file', this.file);
+      try { if (this.team) lsSet('wtk-team', this.team); else lsDel('wtk-team'); } catch (e) { /* 忽略 */ }
       this.memberList = [];
       if (this.team) { try { const tj = await this.fetchTeam(this.team); if (tj && tj.ok) this.memberList = tj.team.members || []; } catch (e) { /* 忽略 */ } }
       applyParsed(parseMD(j.content));
@@ -2191,7 +2216,7 @@ main{
   /** 恢复上次的排序 / 筛选选择（否则刷新后被还原）。搜索词不持久化。 */
   function loadPoolPrefs() {
     try {
-      const o = JSON.parse(localStorage.getItem(POOL_PREF_KEY) || 'null');
+      const o = JSON.parse(lsGet(POOL_PREF_KEY) || 'null');
       if (!o || typeof o !== 'object') return;
       if (SORT_DEFS.some((d) => d[0] === o.sort)) view.sort = o.sort;
       const f = o.filter;
@@ -2204,7 +2229,7 @@ main{
   }
   function savePoolPrefs() {
     try {
-      localStorage.setItem(POOL_PREF_KEY, JSON.stringify({
+      lsSet(POOL_PREF_KEY, JSON.stringify({
         sort: view.sort,
         filter: { filter: view.filter, priorities: view.priorities, tags: view.tags },
       }));
@@ -2455,7 +2480,7 @@ main{
   /** 应用皮肤并同步选择状态（立即生效 + 记住） */
   function applyTheme(next) {
     document.documentElement.dataset.theme = next;
-    try { localStorage.setItem('wtk-theme', next); } catch (e) { /* 忽略 */ }
+    try { lsSet('wtk-theme', next); } catch (e) { /* 忽略 */ }
     renderThemeSetting();
   }
   function renderThemeSetting() {
@@ -3477,7 +3502,7 @@ main{
       const b = e.target.closest('[data-mode]');
       if (!b) return;
       schedMode = b.dataset.mode === 'workday' ? 'workday' : 'natural';
-      try { localStorage.setItem('wtk-sched', schedMode); } catch (e2) { /* 忽略 */ }
+      try { lsSet('wtk-sched', schedMode); } catch (e2) { /* 忽略 */ }
       renderCalSettings();
       renderCalendar(); renderStats();
       toast(schedMode === 'workday' ? '排期改为「工作日」：拖到日历会跳过周末和法定节假日' : '排期改为「自然日」：拖到日历按自然天数计算');
@@ -3486,7 +3511,7 @@ main{
       const b = e.target.closest('[data-field]');
       if (!b) return;
       calFields[b.dataset.field] = !calFields[b.dataset.field];
-      try { localStorage.setItem('wtk-cal-fields', JSON.stringify(calFields)); } catch (e2) { /* 忽略 */ }
+      try { lsSet('wtk-cal-fields', JSON.stringify(calFields)); } catch (e2) { /* 忽略 */ }
       renderCalSettings();
       renderCalendar();
     });
@@ -3497,7 +3522,7 @@ main{
     const setPoolCollapsed = (on) => {
       const bv = $('boardView');
       if (bv) bv.classList.toggle('pool-collapsed', !!on);
-      try { localStorage.setItem('wtk-pool-collapsed', on ? '1' : '0'); } catch (e2) { /* 忽略 */ }
+      try { lsSet('wtk-pool-collapsed', on ? '1' : '0'); } catch (e2) { /* 忽略 */ }
       const tip = on ? '展开任务池' : '收起任务池';
       const t1 = $('btnPoolToggle'); if (t1) t1.title = tip;
       const t2 = $('btnPoolCollapse'); if (t2) t2.title = tip;
@@ -3505,7 +3530,7 @@ main{
     const togglePool = () => { const bv = $('boardView'); setPoolCollapsed(!(bv && bv.classList.contains('pool-collapsed'))); };
     if ($('btnPoolToggle')) $('btnPoolToggle').onclick = togglePool;
     if ($('btnPoolCollapse')) $('btnPoolCollapse').onclick = togglePool;
-    let poolCollapsed0 = false; try { poolCollapsed0 = localStorage.getItem('wtk-pool-collapsed') === '1'; } catch (e2) { /* 忽略 */ }
+    let poolCollapsed0 = false; try { poolCollapsed0 = lsGet('wtk-pool-collapsed') === '1'; } catch (e2) { /* 忽略 */ }
     setPoolCollapsed(poolCollapsed0);
 
     /* ---------------- 新建看板 / 团队设置 ---------------- */
@@ -3748,7 +3773,7 @@ main{
   async function boot() {
     if (booted) return;
     booted = true;
-    const th = localStorage.getItem('wtk-theme');
+    const th = lsGet('wtk-theme');
     if (th) document.documentElement.dataset.theme = th;
     loadPoolPrefs();               // 恢复上次的排序 / 筛选选择
     bindUI();
@@ -3802,6 +3827,8 @@ main{
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
+  // 按账号隔离的本地存储（由第一段脚本提供）
+  var LS = window.__wtkLs || { get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 忽略 */ } } };
 
   var chatEl, formEl, textEl, sendBtn;
   var history = [];          // 会话历史 {role, content}
@@ -4180,7 +4207,7 @@ main{
       loadConfig();
       setTimeout(function () { if (textEl) textEl.focus(); }, 80);
     }
-    if (persist !== false) { try { localStorage.setItem('wtk-right-tab', name); } catch (e) { /* 忽略 */ } }
+    if (persist !== false) { try { LS.set('wtk-right-tab', name); } catch (e) { /* 忽略 */ } }
   }
 
   function bind() {
@@ -4195,7 +4222,7 @@ main{
     });
     // 恢复上次停留的标签页（默认任务池）
     var startTab = 'pool';
-    try { startTab = localStorage.getItem('wtk-right-tab') || 'pool'; } catch (e2) { /* 忽略 */ }
+    try { startTab = LS.get('wtk-right-tab') || 'pool'; } catch (e2) { /* 忽略 */ }
     switchRightTab(startTab, false);
 
     formEl.addEventListener('submit', function (e) { e.preventDefault(); send(textEl.value); });
@@ -4326,6 +4353,8 @@ main{
   var ASSET_DIR  = 'assets/cat/';           // 素材目录（相对当前页面，兼容 /board/ 子路径部署；由 server.js 静态提供）
   var LS_KEY     = 'wtk-cat';               // 位置持久化 key
   var LS_CFG     = 'wtk-cat-config';        // 外观 / 行为偏好持久化 key
+  // 按账号隔离的本地存储（由第一段脚本提供）
+  var LS = window.__wtkLs || { get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 忽略 */ } } };
 
   /* 动作自动切换的停留时长（秒）—— 从区间里随机取，刻意不做成设置项。
      为什么去掉这个设置：间隔一旦固定，猫的节奏就变得可预期（隔多久换、几点换
@@ -4788,7 +4817,7 @@ main{
   /* ---------------- 偏好持久化（开关 / 大小 / 速度 / 动作切换间隔） ---------------- */
   function loadCfg() {
     try {
-      var o = JSON.parse(localStorage.getItem(LS_CFG) || 'null');
+      var o = JSON.parse(LS.get(LS_CFG) || 'null');
       if (!o) return;
       if (typeof o.on === 'boolean') cfg.on = o.on;
       if (isFinite(o.w)) cfg.w = Math.min(W_MAX, Math.max(W_MIN, +o.w));
@@ -4799,7 +4828,7 @@ main{
   }
   function saveCfg() {
     try {
-      localStorage.setItem(LS_CFG, JSON.stringify({
+      LS.set(LS_CFG, JSON.stringify({
         on: cfg.on, w: cfg.w, tripSec: cfg.tripSec
       }));
     } catch (e) { /* 忽略 */ }
@@ -4827,13 +4856,13 @@ main{
   /* ---------------- 位置持久化 ---------------- */
   function save() {
     try {
-      localStorage.setItem(LS_KEY, JSON.stringify({ x: Math.round(pos.x), y: Math.round(pos.y) }));
+      LS.set(LS_KEY, JSON.stringify({ x: Math.round(pos.x), y: Math.round(pos.y) }));
     } catch (e) { /* 隐私模式等场景忽略 */ }
   }
 
   function load() {
     try {
-      var o = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+      var o = JSON.parse(LS.get(LS_KEY) || 'null');
       if (o && isFinite(o.x) && isFinite(o.y)) return { x: +o.x, y: +o.y };
     } catch (e) { /* 忽略 */ }
     return null;

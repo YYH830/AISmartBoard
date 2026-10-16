@@ -631,13 +631,19 @@ function isAuthed(req) {
 
 /** 登录成功：下发登录 Cookie（HttpOnly，脚本读不到，降低被窃取的风险） */
 function setAuthCookie(res, u, p) {
-  res.setHeader('Set-Cookie',
-    COOKIE_NAME + '=' + authTokenFor(u, p) + '; Path=/; Max-Age=' + COOKIE_MAX_AGE + '; HttpOnly; SameSite=Lax');
+  // 鉴权 Cookie 保持 HttpOnly；另发一个非 HttpOnly 的 wtk_user（仅账号名），供前端做「按账号隔离」的本地设置
+  res.setHeader('Set-Cookie', [
+    COOKIE_NAME + '=' + authTokenFor(u, p) + '; Path=/; Max-Age=' + COOKIE_MAX_AGE + '; HttpOnly; SameSite=Lax',
+    'wtk_user=' + encodeURIComponent(u) + '; Path=/; Max-Age=' + COOKIE_MAX_AGE + '; SameSite=Lax'
+  ]);
 }
 
 /** 退出登录：清除 Cookie */
 function clearAuthCookie(res) {
-  res.setHeader('Set-Cookie', COOKIE_NAME + '=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax');
+  res.setHeader('Set-Cookie', [
+    COOKIE_NAME + '=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+    'wtk_user=; Path=/; Max-Age=0; SameSite=Lax'
+  ]);
 }
 
 /** 返回登录页；文件读不到时退回一段内置的最简页面 */
@@ -1561,6 +1567,11 @@ const server = http.createServer(async (req, res) => {
 
     // ---------- 服务状态（界面上的「服务状态」面板用） ----------
     if (pathname === '/api/status') {
+      // 老登录态可能没有 wtk_user Cookie：借这次请求补发一下，让「按账号隔离的本地设置」自愈
+      const _u = authedUser(req);
+      if (_u && authOn && !/wtk_user=/.test(req.headers.cookie || '')) {
+        res.setHeader('Set-Cookie', 'wtk_user=' + encodeURIComponent(_u) + '; Path=/; Max-Age=' + COOKIE_MAX_AGE + '; SameSite=Lax');
+      }
       sendJson(res, {
         ok: true,
         app: APP_TAG,
