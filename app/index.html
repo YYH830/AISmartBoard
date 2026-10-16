@@ -128,7 +128,7 @@ input,textarea,select{font-family:inherit;font-size:inherit;color:inherit}
         这样无论窗口多大，两栏都精确地各让出 / 得到 200px。
         窗口变窄时任务池不会小于 300px（minmax 下限）*/
 main{
-  flex:1;display:grid;
+  flex:1;display:grid;position:relative;
   grid-template-columns:minmax(0,1fr) minmax(300px, calc((100% - 12px) * 0.3617 - 200px));
   gap:12px;min-height:0;
 }
@@ -883,13 +883,14 @@ main{
 .ai-edge span{display:inline-block;font-size:12.5px;font-weight:650;letter-spacing:0;line-height:1.35;text-align:center}
 .ai-edge.active{background:var(--panel);color:var(--brand-1);border:1px solid var(--line);border-right:0;box-shadow:-12px 0 26px -16px rgba(60,40,20,.42)}
 
-/* AI 面板：与任务池同一栏、同尺寸；默认隐藏，ai-open 时从右侧滑入 */
-#aiPanel{display:none;animation:none}
+/* AI 面板：浮在任务池上方、同宽同高；进出都从右侧滑动 */
+#aiPanel{display:none;animation:none;position:absolute;z-index:6}
 #boardView.ai-open{overflow:hidden}
-#boardView.ai-open #poolPanel{display:none}
 #boardView.ai-open #aiPanel{display:flex}
-#aiPanel.sliding{animation:aiSlideIn .3s cubic-bezier(.22,.8,.25,1) both}
-@keyframes aiSlideIn{from{opacity:.4;transform:translateX(100%)}to{opacity:1;transform:none}}
+#aiPanel.sliding-in{animation:aiSlideIn .3s cubic-bezier(.22,.8,.25,1) both}
+#aiPanel.sliding-out{animation:aiSlideOut .28s cubic-bezier(.45,0,.7,.35) both}
+@keyframes aiSlideIn{from{opacity:.35;transform:translateX(100%)}to{opacity:1;transform:none}}
+@keyframes aiSlideOut{from{opacity:1;transform:none}to{opacity:.15;transform:translateX(100%)}}
 .ai-head{padding-top:8px;padding-bottom:8px}
 .ai-head .ai-title{font-size:14px;font-weight:680;color:var(--text);display:flex;align-items:center;gap:8px}
 .ai-head .ai-title svg{width:16px;height:16px;color:var(--brand-1)}
@@ -4197,42 +4198,66 @@ main{
   }
   function closeHistory() { $('aiHistBackdrop').style.display = 'none'; }
 
-  /* ---------- AI 面板：从右侧滑出 / 收起 ---------- */
+  /* ---------- AI 面板：浮在任务池上方，进出均从右侧滑动 ---------- */
   function aiRoot() { return document.getElementById('boardView'); }
+
+  /** 让 AI 面板的几何尺寸与任务池完全一致（相对 boardView 定位） */
+  function layoutPanel() {
+    var root = aiRoot(), p = $('aiPanel'), src = $('poolPanel');
+    if (!root || !p || !src) return;
+    var rb = root.getBoundingClientRect(), sb = src.getBoundingClientRect();
+    if (!sb.width || !sb.height) return;                 // 任务池未显示时不改
+    p.style.left = (sb.left - rb.left) + 'px';
+    p.style.top = (sb.top - rb.top) + 'px';
+    p.style.width = sb.width + 'px';
+    p.style.height = sb.height + 'px';
+  }
 
   function openDock() {
     var root = aiRoot(), p = $('aiPanel'), e = $('aiEdge');
-    if (!root || !p) return;
-    // 若任务池处于「收起」状态，先展开（AI 与任务池占同一栏）
+    if (!root || !p || root.classList.contains('ai-open')) return;
+    // 若任务池处于「收起」状态，先展开（AI 面板要与任务池同栏同位）
     if (root.classList.contains('pool-collapsed')) {
       root.__aiPrevCollapsed = true;
       if (window.__wtkSetPoolCollapsed) window.__wtkSetPoolCollapsed(false);
       else root.classList.remove('pool-collapsed');
     }
+    layoutPanel();                       // 先摆好位置，避免闪现
     root.classList.add('ai-open');
     if (e) { e.classList.add('active'); e.title = '收起 AI 智能分析'; }
-    p.classList.remove('sliding'); void p.offsetWidth; p.classList.add('sliding');
+    p.classList.remove('sliding-out', 'sliding-in'); void p.offsetWidth; p.classList.add('sliding-in');
     loadConfig();
     setTimeout(function () { if (textEl) textEl.focus(); }, 140);
   }
 
   function closeDock() {
     var root = aiRoot(), p = $('aiPanel'), e = $('aiEdge');
-    if (!root || !p) return;
-    root.classList.remove('ai-open');
-    p.classList.remove('sliding');
-    if (e) { e.classList.remove('active'); e.title = 'AI 智能分析'; }
-    if (root.__aiPrevCollapsed) {
-      root.__aiPrevCollapsed = false;
-      if (window.__wtkSetPoolCollapsed) window.__wtkSetPoolCollapsed(true);
-      else root.classList.add('pool-collapsed');
-    }
+    if (!root || !p || !root.classList.contains('ai-open') || root.__aiClosing) return;
+    root.__aiClosing = true;
+    p.classList.remove('sliding-in'); void p.offsetWidth; p.classList.add('sliding-out');
+    var finish = function () {
+      if (!root.__aiClosing) return;
+      root.__aiClosing = false;
+      p.classList.remove('sliding-out');
+      root.classList.remove('ai-open');
+      if (e) { e.classList.remove('active'); e.title = 'AI 智能分析'; }
+      if (root.__aiPrevCollapsed) {
+        root.__aiPrevCollapsed = false;
+        if (window.__wtkSetPoolCollapsed) window.__wtkSetPoolCollapsed(true);
+        else root.classList.add('pool-collapsed');
+      }
+    };
+    p.addEventListener('animationend', function h() { p.removeEventListener('animationend', h); finish(); });
+    setTimeout(finish, 420);             // 兑底：万一 animationend 不触发
   }
 
   function toggleDock() {
     var root = aiRoot(); if (!root) return;
     if (root.classList.contains('ai-open')) closeDock(); else openDock();
   }
+
+  // 窗口尺寸变化时，面板跟着任务池重新对齐
+  window.addEventListener('resize', function () { var root = aiRoot(); if (root && root.classList.contains('ai-open')) layoutPanel(); });
 
   function bind() {
     chatEl = $('aiChat'); formEl = $('aiForm'); textEl = $('aiText'); sendBtn = $('aiSend');
