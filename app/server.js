@@ -270,8 +270,26 @@ const TEMPLATE = [
   '',
   '## 一、任务池',
   '',
-  '| 编号 | 任务 | 状态 | 预估人天 | 备注 |',
-  '| :--- | :--- | :--- | ---: | :--- |',
+  '| 编号 | 任务 | 状态 | 优先级 | 标签 | 预估人天 | 备注 |',
+  '| :--- | :--- | :--- | :--- | :--- | ---: | :--- |',
+  '',
+  '## 二、排期',
+  '',
+  '| 编号 | 开始 | 结束 |',
+  '| :--- | :--- | :--- |',
+  ''
+].join('\n');
+
+// 团队看板模板：比个人台账多一列「负责人」
+const TEAM_TEMPLATE = [
+  '# AI智能看板',
+  '',
+  '> 本文件由「AI智能看板」自动读写，可手工编辑；保存后看板会自动刷新。',
+  '',
+  '## 一、任务池',
+  '',
+  '| 编号 | 任务 | 状态 | 优先级 | 标签 | 预估人天 | 负责人 | 备注 |',
+  '| :--- | :--- | :--- | :--- | :--- | ---: | :--- | :--- |',
   '',
   '## 二、排期',
   '',
@@ -874,8 +892,165 @@ function writeChatRecords(dir, user, recs) {
   try { fs.writeFileSync(chatFilePath(dir, user), CHAT_HEAD + body, 'utf8'); } catch (e) { /* 忽略 */ }
 }
 
+/* ----------------------------------------------------------------------------
+ * AI 工具（function calling）：目前只开放「创建任务」一个工具。
+ * 设计要点：模型调用 create_tasks 后，服务端【不会直接写库】，而是把解析出的
+ * 任务回传给前端，由用户二次确认后再调 /api/ai/execute 落库。
+ * -------------------------------------------------------------------------- */
+const AI_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'create_tasks',
+      description: '根据用户要求创建一条或多条任务。当用户明确让你「建任务/加任务/记个待办」，' +
+        '或给你一段文字（如会议纪要）让你把里面的待办拆成任务时调用。只提取真实存在的任务，不要臆造，' +
+        '也不要重复台账里已有的任务。',
+      parameters: {
+        type: 'object',
+        properties: {
+          tasks: {
+            type: 'array',
+            description: '要创建的任务列表',
+            items: {
+              type: 'object',
+              properties: {
+                title:    { type: 'string', description: '任务名称，简洁的动宾短语' },
+                priority: { type: 'string', enum: ['high', 'medium', 'low'], description: '优先级：用户说紧急/重要→high；说低优先/不急→low；否则 medium' },
+                status:   { type: 'string', enum: ['todo', 'done', 'paused'], description: '状态，默认 todo（未完成）' },
+                days:     { type: 'number', description: '预估人天，拿不准填 1' },
+                tags:     { type: 'array', items: { type: 'string' }, description: '标签，仅在用户明确提到时填' },
+                assignee: { type: 'string', description: '负责人，仅团队看板且用户明确提到时填' },
+                note:     { type: 'string', description: '备注，可放截止时间等补充信息' }
+              },
+              required: ['title']
+            }
+          },
+          note: { type: 'string', description: '给用户的一句话说明，例如「我识别出 3 条待办」' }
+        },
+        required: ['tasks']
+      }
+    }
+  }
+];
+
+const STATUS_CN_BY_KEY = { todo: '未完成', done: '已完成', paused: '已暂停' };
+const STATUS_KEY = {
+  todo: 'todo', '未完成': 'todo', '待办': 'todo', '进行中': 'todo', '未开始': 'todo', open: 'todo',
+  done: 'done', '已完成': 'done', '完成': 'done', closed: 'done',
+  paused: 'paused', '已暂停': 'paused', '暂停': 'paused'
+};
+const PRIORITY_CN_BY_KEY = { high: '高', medium: '中', low: '低' };
+const PRIORITY_KEY = {
+  high: 'high', '高': 'high', '紧急': 'high', '重要': 'high',
+  medium: 'medium', '中': 'medium', normal: 'medium', '一般': 'medium',
+  low: 'low', '低': 'low', '不紧急': 'low'
+};
+
+/** 把模型给的任务对象规范化成内部结构（校验 + 兜底默认值 + 单次上限） */
+function normalizeAiTasks(raw) {
+  const list = (raw && Array.isArray(raw.tasks)) ? raw.tasks : [];
+  const out = [];
+  for (const t of list) {
+    if (!t) continue;
+    let title = String(t.title == null ? '' : t.title).replace(/\s+/g, ' ').trim();
+    if (!title) continue;
+    if (title.length > 120) title = title.slice(0, 120);
+    const status = STATUS_KEY[String(t.status || '').trim()] || STATUS_KEY[String(t.status || '').trim().toLowerCase()] || 'todo';
+    const pri = String(t.priority == null ? '' : t.priority).trim();
+    const priority = PRIORITY_KEY[pri] || PRIORITY_KEY[pri.toLowerCase()] || 'medium';
+    let days = Number(t.days);
+    if (!isFinite(days) || days <= 0) days = 1;
+    if (days > 999) days = 999;
+    days = Math.round(days * 100) / 100;
+    const tags = Array.isArray(t.tags)
+      ? t.tags.map((x) => String(x == null ? '' : x).trim()).filter(Boolean).slice(0, 8)
+      : [];
+    const assignee = String(t.assignee == null ? '' : t.assignee).trim();
+    const note = String(t.note == null ? '' : t.note).replace(/\s*\n+\s*/g, ' ').trim();
+    out.push({ title: title, status: status, priority: priority, days: days, tags: tags, assignee: assignee, note: note });
+  }
+  return out.slice(0, 50);   // 单次最多 50 条，防止模型「手滑」一次灌几百条
+}
+
+/**
+ * 在台账 Markdown 的「任务池」表末尾追加任务行。
+ * 按表头名称定位列（而不是固定下标），个人/团队看板都能用。
+ * 返回 { content, created }。
+ */
+function appendTasksToLedger(content, tasks) {
+  const lines = String(content || '').split(/\r?\n/);
+  const isSep = (s) => /^\|?[\s:|-]+\|[\s:|-]*$/.test(s) && s.indexOf('-') >= 0;
+
+  // 1) 定位任务池标题，再找它下面的表头行
+  let secIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^#{1,6}\s/.test(lines[i].trim()) && /任务/.test(lines[i])) { secIdx = i; break; }
+  }
+  let headIdx = -1;
+  for (let i = (secIdx >= 0 ? secIdx + 1 : 0); i < lines.length; i++) {
+    const s = lines[i].trim();
+    if (secIdx >= 0 && i > secIdx && /^#{1,6}\s/.test(s)) break;   // 已出了任务池小节
+    if (s.startsWith('|') && /编号|\bid\b/i.test(s)) { headIdx = i; break; }
+  }
+  if (headIdx < 0) {
+    // 没有任务池表：补一个空的表头
+    if (lines.length && lines[lines.length - 1].trim() !== '') lines.push('');
+    lines.push('## 一、任务池', '',
+      '| 编号 | 任务 | 状态 | 优先级 | 标签 | 预估人天 | 备注 |',
+      '| :--- | :--- | :--- | :--- | :--- | ---: | :--- |');
+    headIdx = lines.length - 2;
+  }
+
+  const splitRow = (line) => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+  const header = splitRow(lines[headIdx]);
+  let sepIdx = headIdx + 1;
+  if (!(sepIdx < lines.length && isSep(lines[sepIdx].trim()))) sepIdx = headIdx;  // 容错：没有分隔行
+  let endIdx = sepIdx;
+  for (let i = sepIdx + 1; i < lines.length; i++) {
+    if (!lines[i].trim().startsWith('|')) break;
+    endIdx = i;
+  }
+
+  // 2) 收集已用编号，按最小可用 T{n} 分配新编号
+  const idCol = Math.max(0, header.findIndex((h) => /编号|\bid\b/i.test(h)));
+  const used = new Set();
+  for (let i = sepIdx + 1; i <= endIdx; i++) {
+    const c = splitRow(lines[i]);
+    if (c[idCol]) used.add(c[idCol]);
+  }
+  const nextId = () => { let n = 1; while (used.has('T' + n)) n++; used.add('T' + n); return 'T' + n; };
+  const cellOf = (v) => String(v == null ? '' : v).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim();
+
+  // 3) 逐条按表头生成单元格
+  const created = [];
+  const newRows = [];
+  for (const t of tasks) {
+    const id = nextId();
+    const cols = header.map((h) => {
+      const k = h.toLowerCase();
+      if (/编号|\bid\b/.test(k)) return id;
+      if (/任务|标题|title/.test(k)) return cellOf(t.title);
+      if (/状态|status/.test(k)) return STATUS_CN_BY_KEY[t.status] || '未完成';
+      if (/优先级|优先|priority/.test(k)) return PRIORITY_CN_BY_KEY[t.priority] || '中';
+      if (/标签|tag/.test(k)) return cellOf((t.tags || []).join('，'));
+      if (/人天|预估|工作量|天数/.test(k)) return String(t.days);
+      if (/负责人|成员|指派|责任人|执行人/.test(k)) return cellOf(t.assignee || '');
+      if (/备注|note|说明/.test(k)) return cellOf(t.note || '');
+      return '';
+    });
+    newRows.push('| ' + cols.join(' | ') + ' |');
+    created.push({ id: id, title: t.title, status: t.status, priority: t.priority, days: t.days });
+  }
+
+  // 4) 插到数据行末尾 + 更新时间戳
+  lines.splice(endIdx + 1, 0, ...newRows);
+  const out = lines.join('\n').replace(/(>\s*最后更新：).*$/m, '$1' + nowStamp());
+  return { content: out, created: created };
+}
+
 /** 把台账内容包装成 system 提示，让模型先“读懂”再回答 */
-function buildAiSystemPrompt(file, content) {
+function buildAiSystemPrompt(file, content, opts) {
+  const isTeam = !!(opts && opts.isTeam);
   const now = new Date();
   const pad2 = (n) => String(n).padStart(2, '0');
   const fmt = (d) => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
@@ -885,15 +1060,27 @@ function buildAiSystemPrompt(file, content) {
   const monday = new Date(now); monday.setDate(now.getDate() - wd);
   const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
   return [
-    '你是这个人的私人工作助理，负责帮他梳理、总结和分析自己的工作。',
+    '你是这个人的私人工作助理，负责帮他梳理、总结、分析工作；当他明确要求时，也通过工具帮他创建任务。',
     '下面是他的一份《AI智能看板》（Markdown 文件）：',
-    '  · 「任务池」表：列 = 编号 | 任务 | 状态 | 预估人天 | 备注',
+    '  · 「任务池」表：列 = 编号 | 任务 | 状态 | 优先级 | 标签 | 预估人天 | 备注',
     '  · 「排期」表：列 = 编号 | 开始 | 结束',
-    '你只能基于这份台账内容回答，不要编造台账里没有的任务；信息不足时请如实说明。',
+    '当前看板类型：' + (isTeam ? '团队看板（任务有「负责人」列）' : '个人看板') + '。',
+    '',
+    '【回答类问题】',
+    '只基于这份台账内容回答，不要编造台账里没有的任务；信息不足时请如实说明。',
+    '用户让你总结时，主动勾出：未完成/进行中的任务、逾期（结束日期早于今天且未完成）、工作量分布等要点。',
+    '',
+    '【创建任务】',
+    '当用户明确说「建任务 / 加任务 / 记个待办」或给你一段文字（如会议纪要）让你把待办拆成任务时，调用 create_tasks 工具。',
+    '· 只提取真实存在的任务，不要臆造，也不要重复台账里已有的任务；',
+    '· 字段规则：状态默认 todo；优先级用户说紧急/重要用 high、说不急/低优先用 low、否则 medium；预估人天拿不准就填 1；标签、负责人只在用户明确提到时填（个人看板没有负责人列）；',
+    '· 工具只是「提交待确认」，创建前用户还会二次确认，所以放心调用；',
+    '· 若你的回复里还有一句话要说（例如「我识别出 3 条待办」），可放进工具的 note 字段，或直接作为正文输出。',
+    '· 其它情况（闲聊、与台账无关的问题）正常回答即可，不要调用工具。',
+    '',
     '今天日期是 ' + today + '（星期' + wk + '）。本周（周一到周日）是 ' + fmt(monday) + ' 到 ' + fmt(sunday) + '。',
     '涉及日期与星期一律以上面给定的为准，不要自己推算，也不要写错星期；拿不准就先如实说明。',
     '回复用中文，条理清晰、简洁，可用小标题或列表。',
-    '用户让你总结时，主动勾出：未完成/进行中的任务、逾期（结束日期早于今天且未完成）、工作量分布等要点。',
     '',
     '===== 台账文件：' + file + ' =====',
     content || '（该台账目前为空）',
@@ -974,6 +1161,65 @@ async function streamModel(cfg, messages, onDelta) {
   }
 }
 
+/**
+ * 流式调用（带工具）：一边把文本回调给 onDelta，一边累积 tool_calls 分片。
+ * 返回 { content, toolCalls:[{id,name,args}] }。
+ * 模型若只想聊天，就只返回 content；想干活，就返回 toolCalls。
+ */
+async function streamModelWithTools(cfg, messages, tools, onDelta) {
+  const extra = (tools && tools.length) ? { tools: tools, tool_choice: 'auto' } : {};
+  const { url, init } = aiRequest(cfg, messages, true, extra);
+  const r = await aiFetch(url, init, 180000);
+  if (!r.ok || !r.body) {
+    const text = await r.text().catch(() => '');
+    let j = null; try { j = JSON.parse(text); } catch (e) { /* 非 JSON */ }
+    throw new Error((j && j.error && j.error.message) || ('HTTP ' + r.status + ' ' + text.slice(0, 200)));
+  }
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '', content = '', done = false;
+  const calls = {};   // index -> { id, name, args }
+  const handle = (payload) => {
+    let j = null; try { j = JSON.parse(payload); } catch (e) { return; }
+    const d = j.choices && j.choices[0] && (j.choices[0].delta || j.choices[0].message);
+    if (!d) return;
+    if (typeof d.content === 'string' && d.content) { content += d.content; if (onDelta) onDelta(d.content); }
+    if (Array.isArray(d.tool_calls)) {
+      for (const piece of d.tool_calls) {
+        const idx = piece.index == null ? 0 : piece.index;
+        const c = calls[idx] || (calls[idx] = { id: '', name: '', args: '' });
+        if (piece.id) c.id = piece.id;
+        if (piece.function) {
+          if (piece.function.name) c.name = piece.function.name;
+          if (typeof piece.function.arguments === 'string') c.args += piece.function.arguments;
+        }
+      }
+    }
+  };
+  while (!done) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    buf += dec.decode(chunk.value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, idx).trim();
+      buf = buf.slice(idx + 1);
+      if (!line || line.charAt(0) === ':') continue;
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (payload === '[DONE]') { done = true; break; }
+      handle(payload);
+    }
+  }
+  const toolCalls = Object.keys(calls).sort((a, b) => a - b).map((k) => {
+    const c = calls[k];
+    let args = {};
+    try { args = JSON.parse(c.args || '{}'); } catch (e) { args = {}; }
+    return { id: c.id, name: c.name, args: args, rawArgs: c.args };
+  });
+  return { content: content, toolCalls: toolCalls };
+}
+
 /* ------------------------------ 请求处理 ------------------------------ */
 const server = http.createServer(async (req, res) => {
   try {
@@ -1038,7 +1284,12 @@ const server = http.createServer(async (req, res) => {
       const id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const t = { id: id, name: name, owner: me.user, createdAt: new Date().toISOString(), members: [] };
       saveTeam(t);
-      const d = teamDir(id); ensureLedgerDir(d);
+      const d = teamDir(id);
+      // 新建团队看板：直接给一份带「负责人」列的空白台账（团队看板是全新的，文件名不会撞车）
+      try {
+        fs.mkdirSync(d, { recursive: true });
+        fs.writeFileSync(path.join(d, DEFAULT_FILE), TEAM_TEMPLATE, 'utf8');
+      } catch (e) { ensureLedgerDir(d); }
       appendAudit(d, me.user, [{ act: '创建看板', target: name }]);
       sendJson(res, { ok: true, team: { id: id, name: name, file: DEFAULT_FILE, tasks: 0, mtime: getMTime(d, DEFAULT_FILE), members: 0 } });
       return;
@@ -1421,7 +1672,7 @@ const server = http.createServer(async (req, res) => {
       const history = Array.isArray(j.messages)
         ? j.messages.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim()).slice(-12)
         : [];
-      const messages = [{ role: 'system', content: buildAiSystemPrompt(fileName, content) }].concat(history);
+      const messages = [{ role: 'system', content: buildAiSystemPrompt(fileName, content, { isTeam: !!b.team }) }].concat(history);
 
       res.writeHead(200, {
         'Content-Type': 'text/event-stream; charset=utf-8',
@@ -1431,10 +1682,27 @@ const server = http.createServer(async (req, res) => {
       });
       const push = (obj) => { try { res.write('data: ' + JSON.stringify(obj) + '\n\n'); } catch (e) { /* 连接已断 */ } };
       let full = '';
+      let recText = '';
       try {
-        await streamModel(cfg, messages, (delta) => { full += delta; push({ delta: delta }); });
+        const res2 = await streamModelWithTools(cfg, messages, AI_TOOLS, (delta) => { full += delta; push({ delta: delta }); });
+        // 模型决定调用「创建任务」工具：不直接写库，把任务回传前端做二次确认
+        const call = (res2.toolCalls || []).filter((c) => c.name === 'create_tasks')[0];
+        if (call) {
+          const tasks = normalizeAiTasks(call.args);
+          const note = call.args && typeof call.args.note === 'string' ? call.args.note.trim() : '';
+          if (!tasks.length) {
+            const msg = '我没有从你的要求里识别出可以创建的任务，换个说法、或把内容再贴一次？';
+            push({ delta: (full ? '\n\n' : '') + msg });
+            recText = full || msg;
+          } else {
+            push({ action: { type: 'create_tasks', tasks: tasks, note: note, isTeam: !!b.team, file: fileName } });
+            recText = full || ('（AI 建议创建 ' + tasks.length + ' 个任务，待确认）');
+          }
+        } else {
+          recText = full;
+        }
         push({ done: true });
-        if (full.trim()) {
+        if (recText.trim()) {
           const lastUser = history.filter((m) => m.role === 'user').slice(-1)[0];
           try {
             appendChatRecord(dir, b.user, {
@@ -1443,7 +1711,7 @@ const server = http.createServer(async (req, res) => {
               file: fileName,
               user: b.user,
               q: (lastUser && lastUser.content) || '',
-              a: full
+              a: recText
             });
           } catch (e2) { /* 存历史失败不影响回答 */ }
         }
@@ -1451,6 +1719,39 @@ const server = http.createServer(async (req, res) => {
         push({ error: String(e && e.message ? e.message : e) });
       }
       res.end();
+      return;
+    }
+
+    // ---------- AI 智能分析：执行二次确认后的操作（目前只有「创建任务」） ----------
+    if (pathname === '/api/ai/execute') {
+      if (req.method !== 'POST') { sendJson(res, { ok: false, error: 'method not allowed' }, 405); return; }
+      const j = (await readJson(req)) || {};
+      const b = resolveBoard(req, j.team, j.file);
+      if (!b) { sendJson(res, { ok: false, error: 'forbidden' }, 403); return; }
+      const action = j.action || {};
+      if (action.type !== 'create_tasks') { sendJson(res, { ok: false, error: '不支持的操作' }, 400); return; }
+      const tasks = normalizeAiTasks({ tasks: action.tasks });
+      if (!tasks.length) { sendJson(res, { ok: false, error: '没有可创建的任务' }, 400); return; }
+
+      const dir = b.dir;
+      const name = b.file;
+      ensureLedgerDir(dir);
+      const oldText = readData(dir, name);
+      // 乐观并发：客户端可带上加载时的 mtime（X-Wtk-Base），与当前不一致则报冲突
+      const baseHdr = req.headers['x-wtk-base'];
+      if (baseHdr != null && String(baseHdr) !== '') {
+        const base = parseInt(baseHdr, 10);
+        const cur = getMTime(dir, name);
+        if (!isNaN(base) && base > 0 && cur > 0 && base !== cur) {
+          sendJson(res, { ok: false, conflict: true, mtime: cur, content: readData(dir, name) }, 409);
+          return;
+        }
+      }
+      const result = appendTasksToLedger(oldText, tasks);
+      writeData(dir, name, result.content);
+      lastTouchedFile = name;
+      if (b.team) { try { appendAudit(dir, b.user, diffTasks(oldText, result.content)); } catch (e) { /* 忽略 */ } }
+      sendJson(res, { ok: true, created: result.created, count: result.created.length, mtime: getMTime(dir, name), file: name });
       return;
     }
 
