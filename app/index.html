@@ -4110,6 +4110,7 @@ main{
 
     var bub = addMsg('ai', '');
     bub.innerHTML = '<span class="ai-typing"></span>';
+    scrollBottom();               // 气泡插入动画后才变高，需再滚一次到底，否则底部会被截掉
     busy = true; sendBtn.disabled = true;
     var acc = '';
     var hasAction = false;
