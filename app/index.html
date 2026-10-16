@@ -867,7 +867,7 @@ main{
 #boardView.pool-collapsed #poolPanel{display:none}
 @media (max-width:900px){ #boardView.pool-collapsed{grid-template-rows:minmax(320px,1fr)} }
 
-/* ============================== AI 智能分析（右侧标签页） ============================== */
+/* ============================== AI 助理（右侧标签页） ============================== */
 /* AI 与任务池共用一块面板，用顶部标签切换；默认显示任务池 */
 #aiPane{display:none}
 #aiPane .ai-chat{padding:18px 18px 6px}
@@ -999,12 +999,12 @@ main{
       </div>
     </section>
 
-    <!-- 右：任务池 / AI 智能分析（同一面板，顶部标签切换） -->
+    <!-- 右：任务池 / AI 助理（同一面板，顶部标签切换） -->
     <section class="panel" id="poolPanel">
       <div class="pane-head pool-head">
         <div class="tabs" id="rightTabs">
           <button class="tab active" type="button" data-rtab="pool">任务池 <span class="count" id="poolCount"></span></button>
-          <button class="tab" type="button" data-rtab="ai">AI 智能分析</button>
+          <button class="tab" type="button" data-rtab="ai">AI 助理</button>
         </div>
         <div class="spacer"></div>
         <button class="icon-btn" id="aiNewBtn" title="新对话（清空当前对话）" style="display:none">
@@ -3421,7 +3421,7 @@ main{
   window.openBoardSettings = openBoardSettings;
   window.closeBoardSettings = closeBoardSettings;
 
-  // 暴露给第二段脚本（AI 智能分析）：AI 创建任务后刷新当前看板 / 弹顶层提示
+  // 暴露给第二段脚本（AI 助理）：AI 创建任务后刷新当前看板 / 弹顶层提示
   window.__wtkReloadBoard = async function () {
     try { if (dirty) await Store.save(true); } catch (e) { /* 忽略 */ }
     if (Store.mode === 'server') {
@@ -4277,7 +4277,7 @@ main{
   }
   function closeHistory() { $('aiHistBackdrop').style.display = 'none'; }
 
-  /* ---------- 右侧标签页：任务池 / AI 智能分析 ---------- */
+  /* ---------- 右侧标签页：任务池 / AI 助理 ---------- */
   function currentBoardKey() { return (aiTeam() || '') + '|' + aiCurrentFile(); }
 
   /** 清空当前对话（仅清前端，不动服务端历史存档） */
