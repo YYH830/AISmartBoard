@@ -879,8 +879,8 @@ main{
 }
 .ai-edge:hover{filter:brightness(1.06)}
 .ai-edge:active{filter:brightness(.97)}
-.ai-edge svg{width:17px;height:17px;flex:none}
-.ai-edge span{font-size:12.5px;font-weight:650;letter-spacing:0;line-height:1.35;text-align:center}
+.ai-edge svg{width:12px;height:12px;display:inline-block;vertical-align:-1px;margin-right:1px}
+.ai-edge span{display:inline-block;font-size:12.5px;font-weight:650;letter-spacing:0;line-height:1.35;text-align:center}
 .ai-edge.active{background:var(--panel);color:var(--brand-1);border:1px solid var(--line);border-right:0;box-shadow:-12px 0 26px -16px rgba(60,40,20,.42)}
 
 /* AI 面板：与任务池同一栏、同尺寸；默认隐藏，ai-open 时从右侧滑入 */
@@ -1091,8 +1091,7 @@ main{
 
   <!-- ================= AI 侧边悬浮按钮 ================= -->
   <button class="ai-edge" id="aiEdge" title="AI 智能分析" aria-label="AI 智能分析">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.9L18.8 9.7l-4.9 1.9L12 16.5l-1.9-4.9L5.2 9.7l4.9-1.9z"/><path d="M18.6 15.6l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg>
-    <span>AI<br>智能<br>分析</span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.9L18.8 9.7l-4.9 1.9L12 16.5l-1.9-4.9L5.2 9.7l4.9-1.9z"/><path d="M18.6 15.6l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg>AI<br>智能<br>分析</span>
   </button>
 
   <!-- ================= 看板设置（统一入口：个性化 / 日历 / AI） =================
